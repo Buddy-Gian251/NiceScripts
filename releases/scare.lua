@@ -1,5 +1,18 @@
-if _G.NICE_SCARE and _G.NICE_SCARE == true then warn("niceScare is already loaded") return end
-_G.NICE_SCARE = true
+if type(_G.NICE_SCARE) ~= "table" then
+	_G.NICE_SCARE = {}
+end
+
+if _G.NICE_SCARE.loaded then
+	warn("niceScare is already loaded")
+	return
+end
+
+_G.NICE_SCARE.loaded = true
+_G.NICE_SCARE.scaring = _G.NICE_SCARE.scaring or false
+
+while not game:IsLoaded() do 
+	task.wait()
+end
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
@@ -44,21 +57,18 @@ local rand_string = function()
 end
 
 print("PARENT: "..(PARENT and PARENT:GetFullName() or "UNKNOWN"))
+
 local gui = Instance.new("ScreenGui")
 gui.Name = rand_string()
 gui.ResetOnSpawn = false
 gui.IgnoreGuiInset = true
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-gui.DisplayOrder = math.pow(2, 32)
+gui.DisplayOrder = math.pow(2, 12)
 gui.Enabled = true
 gui.Parent = PARENT
 
 local currently_dragged = {}
-local Config = {
-	snap_char_choice = false,
-	lerpSpeed = 16,
-	prediction = true
-}
+local scaring = _G.NICE_SCARE.scaring or false
 
 local playsound = function(id, vol)
 	if not id or id == "" then warn("no id") return end
@@ -174,10 +184,6 @@ local make_draggable = function(UIItem, y_draggable, x_draggable)
 	end)
 end
 
-while not game:IsLoaded() do 
-	task.wait()
-end
-
 playsound(sound_files.startup, 1)
 
 local menu_toggle = Instance.new("TextButton")
@@ -234,15 +240,19 @@ local create_button = function(name, callback)
 	return button
 end
 
-local create_slider = function(name, range, float_enabled, callback)
+local create_slider = function(name, init_number, range, float_enabled, callback)
 	if not name then return end
 	if not range or type(range) ~= "table" or range[1] == nil or range[2] == nil then
-		warn("Slider requires a valid range with min and max values")
+		custom_warn("Slider requires a valid range with min and max values")
 		return
 	end
-	local min_val = range[1]
-	local max_val = range[2]
-	local current_val = min_val
+	local min_val = range[1] :: number
+	local max_val = range[2] :: number
+	local current_val = init_number or min_val :: number
+	current_val = math.clamp(current_val, min_val, max_val)
+	if not float_enabled then
+		current_val = math.floor(current_val + 0.5)
+	end
 	local slide_frame = Instance.new("Frame")
 	slide_frame.Name = tostring(name)
 	slide_frame.Size = UDim2.new(0, 200, 0, 50)
@@ -265,7 +275,6 @@ local create_slider = function(name, range, float_enabled, callback)
 	slider_bar.Parent = slide_frame
 	local slider_handle = Instance.new("Frame")
 	slider_handle.Size = UDim2.new(0, 12, 0, 12)
-	slider_handle.Position = UDim2.new(0, 0, 0.5, 4)
 	slider_handle.AnchorPoint = Vector2.new(0, 0.5)
 	slider_handle.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
 	slider_handle.Parent = slider_bar
@@ -273,15 +282,27 @@ local create_slider = function(name, range, float_enabled, callback)
 	local function update_value(input_position)
 		local relative_x = math.clamp(input_position.X - slider_bar.AbsolutePosition.X, 0, slider_bar.AbsoluteSize.X)
 		local percent = relative_x / slider_bar.AbsoluteSize.X
-		current_val = min_val + (max_val - min_val) * percent
+		local raw_val = min_val + (max_val - min_val) * percent
 		if not float_enabled then
-			current_val = math.floor(current_val + 0.5)
+			current_val = math.floor(raw_val + 0.5)
+			local snapped_percent = (current_val - min_val) / (max_val - min_val)
+			slider_handle.Position = UDim2.new(snapped_percent, 0, 0.5, -6)
+		else
+			current_val = raw_val
+			slider_handle.Position = UDim2.new(percent, 0, 0.5, -6)
 		end
-		slider_handle.Position = UDim2.new(percent, 0, 0.5, -6)
 		if callback then
 			callback(current_val)
 		end
 	end
+	task.defer(function()
+		local percent = (current_val - min_val) / (max_val - min_val)
+		slider_handle.Position = UDim2.new(percent, 0, 0.5, -6)
+
+		if callback then
+			callback(current_val)
+		end
+	end)
 	slider_handle.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
 			dragging = true
@@ -342,6 +363,27 @@ local targetPLR = ""
 local wait_ms = 200
 local front_distance = 0
 
+local scare_function = function(playername) 
+	if scaring then return end 
+	local target = Players:FindFirstChild(playername) 
+	if target then 
+		scaring = true
+		local s_char = myself.Character 
+		local s_hrp = s_char:FindFirstChild("HumanoidRootPart") 
+		local t_char = target.Character 
+		local t_hrp = t_char:FindFirstChild("HumanoidRootPart") 
+		if (t_char and t_hrp) and (s_char and s_hrp) then 
+			message("niceScare", "Scaring "..playername) 
+			local prev_loc = s_char:GetPivot() 
+			local frontCF = t_hrp.CFrame * CFrame.new(0, 0, -front_distance) 
+			s_char:PivotTo(frontCF) 
+			task.wait(wait_ms/1000) 
+			s_char:PivotTo(prev_loc) 
+			scaring = false
+		end 
+	end 
+end
+
 local b_targetPLR = create_text_edit("Target Player", "username", function(a)
 	local a_lower = string.lower(a)
 	for _, player in ipairs(Players:GetPlayers()) do
@@ -352,39 +394,31 @@ local b_targetPLR = create_text_edit("Target Player", "username", function(a)
 	end
 end)
 
-local b_waitms = create_slider("Wait (ms)", {10, 1000}, false, function(v)
+local b_waitms = create_slider("Wait (ms)", 200, {10, 2500}, false, function(v)
 	if v and typeof(v) == "number" then
 		wait_ms = v
 	end
 end)
 
-local b_front_dist = create_slider("Distance (front)", {0, 16}, false, function(v)
-    if v and typeof(v) == "number" then
-        front_distance = v
-    end
+local b_front_dist = create_slider("Distance (front)", 4, {0, 16}, false, function(v)
+	if v and typeof(v) == "number" then
+		front_distance = v
+	end
 end)
 
-local b_scare = create_button("Scare target", function()
-	local target = Players:FindFirstChild(targetPLR)
-	if target then
-		local s_char = myself.Character
-		local s_hrp = s_char:FindFirstChild("HumanoidRootPart")
-		local t_char = target.Character
-		local t_hrp = t_char:FindFirstChild("HumanoidRootPart")
-		if (t_char and t_hrp) and (s_char and s_hrp) then
-			message("niceScare", "Scaring "..targetPLR)
-			local prev_loc = s_char:GetPivot()
-			local frontCF = t_hrp.CFrame * CFrame.new(0, 0, -front_distance)
-			s_char:PivotTo(frontCF)
-			task.wait(wait_ms/1000)
-			s_char:PivotTo(prev_loc)
-		end
-	end
+local b_scare = create_button("Scare target", function() 
+	scare_function(targetPLR) 
+end)
+
+local b_scare_random = create_button("Scare a random player", function() 
+	local random_player = Players:GetPlayers()[math.random(1, #Players:GetPlayers())] 
+	if random_player then 
+		scare_function(random_player.Name) 
+	end 
 end)
 
 menu_toggle.Activated:Connect(function()
-	if next(currently_dragged) then
-		return
-	end
+	if next(currently_dragged) then return end
 	main_frame.Visible = not main_frame.Visible
+	message("niceScare", "niceScare is now " .. (main_frame.Visible and "enabled" or "disabled"), 2)
 end)
