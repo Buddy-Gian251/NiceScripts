@@ -41,7 +41,7 @@ local rand_string = function()
 	return table.concat(array)
 end
 
-local NiceGui = loadstring(game:HttpGet('https://raw.githubusercontent.com/Buddy-Gian251/NiceScripts/main/releases/nice_template.lua'))
+local NiceGui = loadstring(game:HttpGet('https://raw.githubusercontent.com/Buddy-Gian251/NiceScripts/main/releases/nice_template.lua'))()
 local gui = NiceGui.create_gui("niceScare")
 
 local currently_dragged = {}
