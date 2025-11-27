@@ -14,7 +14,6 @@ while not game:IsLoaded() do
 	task.wait()
 end
 
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -42,7 +41,7 @@ local rand_string = function()
 	return table.concat(array)
 end
 
-local NiceGui = require(game.ReplicatedStorage.NiceUI)
+local NiceGui = require(loadstring(game:HttpGet('https://raw.githubusercontent.com/Buddy-Gian251/NiceScripts/main/releases/nice_template.lua')))
 local gui = NiceGui.create_gui("niceScare")
 
 local currently_dragged = {}
