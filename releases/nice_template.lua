@@ -124,6 +124,8 @@ end
 
 playsound(sound_files.startup, 1)
 
+local curr_frame
+
 function NiceUI.create_gui(name)
 	local frame = Instance.new("Frame")
 	frame.Name = name
@@ -136,6 +138,19 @@ function NiceUI.create_gui(name)
 
 	make_draggable(frame)
 
+	local toggle_button = Instance.new("TextButton")
+	toggle_button.Name = "Toggle"
+	toggle_button.Text = "niceGui"
+	toggle_button.Size = UDim2.new(0, 80, 0, 40)
+	toggle_button.Position = UDim2.new(0.5, 0, 0, 50)
+	toggle_button.AnchorPoint = Vector2.new(0.5, 0.5)
+	toggle_button.BackgroundColor3 = Color3.fromRGB(0,0,0)
+	toggle_button.BackgroundTransparency = 0.4
+	toggle_button.TextColor3 = Color3.new(1,1,1)
+	toggle_button.Parent = gui
+
+	make_draggable(toggle_button)
+
 	local listframe = Instance.new("ScrollingFrame")
 	listframe.Size = UDim2.new(1, 0, 1, 0)
 	listframe.CanvasSize = UDim2.new(0,0,0,0)
@@ -147,9 +162,16 @@ function NiceUI.create_gui(name)
 	layout.Padding = UDim.new(0, 6)
 	layout.Parent = listframe
 
+	toggle_button.Activated:Connect(function()
+		if next(currently_dragged) then return end
+		frame.Visible = not frame.Visible
+	end)
+
 	layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
 		listframe.CanvasSize = UDim2.new(0,0,0,layout.AbsoluteContentSize.Y + 20)
 	end)
+
+	curr_frame = listframe
 
 	return {
 		Root = frame,
@@ -157,7 +179,7 @@ function NiceUI.create_gui(name)
 	}
 end
 
-function NiceUI.create_click_button(parent, name, callback)
+function NiceUI.create_click_button(name, callback)
 	local b = Instance.new("TextButton")
 	b.Name = name
 	b.Text = name
@@ -165,7 +187,7 @@ function NiceUI.create_click_button(parent, name, callback)
 	b.BackgroundColor3 = Color3.fromRGB(0,0,0)
 	b.BackgroundTransparency = 0.4
 	b.TextColor3 = Color3.new(1,1,1)
-	b.Parent = parent
+	b.Parent = curr_frame
 
 	b.MouseButton1Click:Connect(function()
 		if callback then callback() end
@@ -173,88 +195,121 @@ function NiceUI.create_click_button(parent, name, callback)
 	return b
 end
 
-function NiceUI.create_slider(parent, name, value, float_enabled, range, callback)
-	local frame = Instance.new("Frame")
-	frame.Name = name
-	frame.Size = UDim2.new(1, -10, 0, 50)
-	frame.BackgroundColor3 = Color3.fromRGB(40,40,40)
-	frame.Parent = parent
-
-	local bar = Instance.new("Frame")
-	bar.Size = UDim2.new(1, -20, 0, 6)
-	bar.Position = UDim2.new(0, 10, 0, 30)
-	bar.BackgroundColor3 = Color3.fromRGB(100,100,100)
-	bar.Parent = frame
-
-	local handle = Instance.new("Frame")
-	handle.Size = UDim2.new(0, 12, 0, 12)
-	handle.AnchorPoint = Vector2.new(0.5, 0.5)
-	handle.BackgroundColor3 = Color3.fromRGB(200,200,200)
-	handle.Parent = bar
-
-	local minv, maxv = range[1], range[2]
-	local current = value
-
-	local function update(x)
-		local rel = math.clamp(x - bar.AbsolutePosition.X, 0, bar.AbsoluteSize.X)
-		local pct = rel / bar.AbsoluteSize.X
-		local val = minv + pct * (maxv - minv)
-
-		if not float_enabled then
-			val = math.floor(val + 0.5)
-			pct = (val - minv) / (maxv - minv)
-		end
-
-		handle.Position = UDim2.new(pct, 0, 0.5, 0)
-		current = val
-		if callback then callback(val) end
+function NiceUI.create_slider(name, init_number, float_enabled, range, callback)
+	if not name then return end
+	if not range or type(range) ~= "table" or range[1] == nil or range[2] == nil then
+		notify("Slider requires a valid range with min and max values")
+		return
 	end
-
-	handle.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			currently_dragged[parent] = true
+	local min_val = range[1] :: number
+	local max_val = range[2] :: number
+	local current_val = init_number or min_val :: number
+	current_val = math.clamp(current_val, min_val, max_val)
+	if not float_enabled then
+		current_val = math.floor(current_val + 0.5)
+	end
+	local slide_frame = Instance.new("Frame")
+	slide_frame.Name = tostring(name)
+	slide_frame.Size = UDim2.new(0, 200, 0, 50)
+	slide_frame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+	slide_frame.BorderSizePixel = 1
+	slide_frame.Parent = curr_frame
+	local title = Instance.new("TextLabel")
+	title.Name = "Title"
+	title.Size = UDim2.new(1, -10, 0, 10)
+	title.Position = UDim2.new(0, 5, 0, 0)
+	title.BackgroundTransparency = 1
+	title.Text = name
+	title.TextScaled = true
+	title.TextColor3 = Color3.new(1,1,1)
+	title.Parent = slide_frame
+	local slider_bar = Instance.new("Frame")
+	slider_bar.Size = UDim2.new(1, -20, 0, 6)
+	slider_bar.Position = UDim2.new(0, 10, 0, 24)
+	slider_bar.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+	slider_bar.Parent = slide_frame
+	local slider_handle = Instance.new("Frame")
+	slider_handle.Size = UDim2.new(0, 12, 0, 12)
+	slider_handle.AnchorPoint = Vector2.new(0, 0.5)
+	slider_handle.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
+	slider_handle.Parent = slider_bar
+	local dragging = false
+	local function update_value(input_position)
+		local relative_x = math.clamp(input_position.X - slider_bar.AbsolutePosition.X, 0, slider_bar.AbsoluteSize.X)
+		local percent = relative_x / slider_bar.AbsoluteSize.X
+		local raw_val = min_val + (max_val - min_val) * percent
+		if not float_enabled then
+			current_val = math.floor(raw_val + 0.5)
+			local snapped_percent = (current_val - min_val) / (max_val - min_val)
+			slider_handle.Position = UDim2.new(snapped_percent, 0, 0.5, -6)
+		else
+			current_val = raw_val
+			slider_handle.Position = UDim2.new(percent, 0, 0.5, -6)
 		end
-	end)
-
-	UserInputService.InputChanged:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseMovement and currently_dragged[parent] then
-			update(input.Position.X)
+		if callback then
+			callback(current_val)
 		end
-	end)
-
-	handle.InputEnded:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			currently_dragged[parent] = nil
-		end
-	end)
-
+	end
 	task.defer(function()
-		local pct = (value - minv) / (maxv - minv)
-		handle.Position = UDim2.new(pct,0,0.5,0)
-	end)
+		local percent = (current_val - min_val) / (max_val - min_val)
+		slider_handle.Position = UDim2.new(percent, 0, 0.5, -6)
 
-	return frame
+		if callback then
+			callback(current_val)
+		end
+	end)
+	slider_handle.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			dragging = true
+		end
+	end)
+	UserInputService.InputChanged:Connect(function(input)
+		if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+			update_value(input.Position)
+		end
+	end)
+	slider_handle.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			dragging = false
+		end
+	end)
+	return slide_frame
 end
 
-function NiceUI.create_text_editor(parent, name, text, callback)
-	local frame = Instance.new("Frame")
-	frame.Size = UDim2.new(1, -10, 0, 50)
-	frame.BackgroundColor3 = Color3.fromRGB(40,40,40)
-	frame.Parent = parent
-
-	local box = Instance.new("TextBox")
-	box.Size = UDim2.new(1, -10, 0, 35)
-	box.Position = UDim2.new(0,5,0,10)
-	box.BackgroundColor3 = Color3.fromRGB(200,200,200)
-	box.Text = text
-	box.ClearTextOnFocus = false
-	box.Parent = frame
-
-	box.FocusLost:Connect(function()
-		if callback then callback(box.Text) end
+function NiceUI.create_text_editor(name, text, callback)
+	if not name then return end
+	local te_frame = Instance.new("Frame")
+	te_frame.Name = tostring(name)
+	te_frame.Size = UDim2.new(0, 200, 0, 50)
+	te_frame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+	te_frame.BorderSizePixel = 1
+	te_frame.Parent = curr_frame
+	local title = Instance.new("TextLabel")
+	title.Name = "Title"
+	title.Size = UDim2.new(1, -10, 0, 10)
+	title.Position = UDim2.new(0, 5, 0, 0)
+	title.BackgroundTransparency = 1
+	title.Text = name
+	title.TextScaled = true
+	title.TextColor3 = Color3.new(1,1,1)
+	title.Parent = te_frame
+	local text_editor = Instance.new("TextBox")
+	text_editor.Name = "TextEditor"
+	text_editor.Size = UDim2.new(1, -10, 0, 30)
+	text_editor.Position = UDim2.new(0, 5, 0, 15)
+	text_editor.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
+	text_editor.Text = tostring(text or "")
+	text_editor.TextColor3 = Color3.fromRGB(0, 0, 0)
+	text_editor.TextScaled = true
+	text_editor.ClearTextOnFocus = false
+	text_editor.Parent = te_frame
+	text_editor.FocusLost:Connect(function()
+		local new_text = text_editor.Text
+		if callback then
+			callback(new_text)
+		end
 	end)
-
-	return frame
+	return te_frame
 end
 
 return NiceUI
