@@ -11,7 +11,7 @@ while not game:IsLoaded() do
 	task.wait()
 end
 
-local NiceGui = require(game:GetService("ReplicatedStorage"):WaitForChild("nicegui")) --loadstring(game:HttpGet('https://raw.githubusercontent.com/Buddy-Gian251/NiceScripts/main/releases/nice_template.lua'))()
+local NiceGui = loadstring(game:HttpGet('https://raw.githubusercontent.com/Buddy-Gian251/NiceScripts/main/releases/nice_template.lua'))()
 local gui = NiceGui.create_gui("niceScare")
 
 local Players = game:GetService("Players")
