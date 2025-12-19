@@ -312,4 +312,16 @@ function NiceUI.create_text_editor(name, text, callback)
 	return te_frame
 end
 
+function NiceUI.display_message(customtitle, customtext, customsound)
+	local nosound = (not customsound) or tostring(customsound) == ""
+
+	notify(
+		"NiceGui: "..tostring(customtitle),
+		"NiceGui: "..tostring(customtext),
+		2,
+		customsound,
+		nosound
+	)
+end
+
 return NiceUI
