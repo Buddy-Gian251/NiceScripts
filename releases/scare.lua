@@ -120,7 +120,7 @@ local b_waitms = NiceGui.create_slider("Wait (ms)", 200, false, {10, 2500}, func
 	end
 end)
 
-local b_front_dist = NiceGui.create_slider("Distance (front)", 4, false, {0, 16}, function(v)
+local b_front_dist = NiceGui.create_slider("Distance (front)", 4, false, {-32, 32}, function(v)
 	if v and typeof(v) == "number" then
 		front_distance = v
 	end
