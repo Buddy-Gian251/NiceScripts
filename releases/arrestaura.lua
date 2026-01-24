@@ -3,7 +3,7 @@ if type(_G.NICE_ARRESTAURA) ~= "table" then
 end
 
 if _G.NICE_ARRESTAURA.loaded then
-	warn("niceScare is already loaded")
+	warn("niceAura is already loaded")
 	return
 end
 
@@ -12,7 +12,7 @@ while not game:IsLoaded() do
 end
 
 local NiceGui = loadstring(game:HttpGet('https://raw.githubusercontent.com/Buddy-Gian251/NiceScripts/main/releases/nice_template.lua'))()
-local gui = NiceGui.create_gui("niceScare")
+local gui = NiceGui.create_gui("niceAura")
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -28,7 +28,7 @@ local enabled = _G.NICE_ARRESTAURA.enabled
 local aura_range = _G.NICE_ARRESTAURA.range
 local conn = nil
 
-local aura_button = NiceGui.create_click_button("Toggle Aura", function() 
+local aura_button = NiceGui.create_click_button("Toggle Aura", nil, function() 
 	enabled = not enabled
 	_G.NICE_ARRESTAURA.enabled = enabled
 	if not enabled then
