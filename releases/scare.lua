@@ -104,7 +104,7 @@ local scare_function = function(playername)
 	end 
 end
 
-local b_targetPLR = NiceGui.create_text_editor("Target Player", "username", function(a)
+local b_targetPLR = NiceGui.create_text_editor("Target Player", "username", "Targets", function(a)
 	local a_lower = string.lower(a)
 	for _, player in ipairs(Players:GetPlayers()) do
 		if string.find(string.lower(player.Name), a_lower) then
@@ -114,23 +114,23 @@ local b_targetPLR = NiceGui.create_text_editor("Target Player", "username", func
 	end
 end)
 
-local b_waitms = NiceGui.create_slider("Wait (ms)", 200, false, {10, 2500}, function(v)
+local b_waitms = NiceGui.create_slider("Wait (ms)", 200, false, {10, 2500}, "Config", function(v)
 	if v and typeof(v) == "number" then
 		wait_ms = v
 	end
 end)
 
-local b_front_dist = NiceGui.create_slider("Distance (front)", 4, false, {-32, 32}, function(v)
+local b_front_dist = NiceGui.create_slider("Distance (front)", 4, false, {-32, 32}, "Config", function(v)
 	if v and typeof(v) == "number" then
 		front_distance = v
 	end
 end)
 
-local b_scare = NiceGui.create_click_button("Scare target", function() 
+local b_scare = NiceGui.create_click_button("Scare target", "Targets", function() 
 	scare_function(targetPLR) 
 end)
 
-local b_scare_random = NiceGui.create_click_button("Scare a random player", function() 
+local b_scare_random = NiceGui.create_click_button("Scare a random player", "Targets", function() 
 	local random_player = Players:GetPlayers()[math.random(1, #Players:GetPlayers())] 
 	if random_player then 
 		scare_function(random_player.Name) 
