@@ -46,7 +46,7 @@ gui.Name = rand_string()
 gui.ResetOnSpawn = false
 gui.IgnoreGuiInset = true
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-gui.DisplayOrder = 4096
+gui.DisplayOrder = math.pow(2,16)
 gui.Parent = PARENT
 
 local currently_dragged = {}
@@ -124,17 +124,49 @@ end
 
 playsound(sound_files.startup, 1)
 
-local curr_frame
+local curr_mframe
+local currtabframe
+local currbuttonsframe
+local tabs = {}
+local active_tab_window = nil
+local DEFAULT_TAB_NAME = "Uncategorized"
 
 function NiceUI.create_gui(name)
 	local frame = Instance.new("Frame")
 	frame.Name = name
-	frame.Size = UDim2.new(0, 200, 0, 300)
+	frame.Size = UDim2.new(0, 500, 0, 300)
 	frame.Position = UDim2.new(0.5, 0, 0.4, 0)
 	frame.AnchorPoint = Vector2.new(0.5, 0.5)
 	frame.BackgroundColor3 = Color3.fromRGB(0,0,0)
 	frame.BackgroundTransparency = 0.4
 	frame.Parent = gui
+
+	-- Tabs column
+	local tabs_frame = Instance.new("ScrollingFrame")
+	tabs_frame.Name = "Tabs"
+	tabs_frame.Size = UDim2.new(0, 100, 1, 0)
+	tabs_frame.Position = UDim2.new(0, 0, 0, 0)
+	tabs_frame.BackgroundColor3 = Color3.fromRGB(0,0,0)
+	tabs_frame.BackgroundTransparency = 0.4
+	tabs_frame.ScrollBarThickness = 6
+	tabs_frame.Parent = frame
+
+	local tabs_layout = Instance.new("UIListLayout")
+	tabs_layout.SortOrder = Enum.SortOrder.LayoutOrder
+	tabs_layout.Padding = UDim.new(0,6)
+	tabs_layout.Parent = tabs_frame
+
+	tabs_layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+		tabs_frame.CanvasSize = UDim2.new(0,0,0,tabs_layout.AbsoluteContentSize.Y + 10)
+	end)
+
+	-- Content area for all tabs
+	local content_frame = Instance.new("Frame")
+	content_frame.Name = "Content"
+	content_frame.Size = UDim2.new(1, -100, 1, 0)
+	content_frame.Position = UDim2.new(0, 100, 0, 0)
+	content_frame.BackgroundTransparency = 1
+	content_frame.Parent = frame
 
 	make_draggable(frame)
 
@@ -143,43 +175,87 @@ function NiceUI.create_gui(name)
 	toggle_button.Text = "niceGui"
 	toggle_button.Size = UDim2.new(0, 80, 0, 40)
 	toggle_button.Position = UDim2.new(0.5, 0, 0, 50)
-	toggle_button.AnchorPoint = Vector2.new(0.5, 0.5)
+	toggle_button.AnchorPoint = Vector2.new(0.5,0.5)
 	toggle_button.BackgroundColor3 = Color3.fromRGB(0,0,0)
 	toggle_button.BackgroundTransparency = 0.4
 	toggle_button.TextColor3 = Color3.new(1,1,1)
 	toggle_button.Parent = gui
-
 	make_draggable(toggle_button)
-
-	local listframe = Instance.new("ScrollingFrame")
-	listframe.Size = UDim2.new(1, 0, 1, 0)
-	listframe.CanvasSize = UDim2.new(0,0,0,0)
-	listframe.BackgroundTransparency = 1
-	listframe.Parent = frame
-
-	local layout = Instance.new("UIListLayout")
-	layout.SortOrder = Enum.SortOrder.LayoutOrder
-	layout.Padding = UDim.new(0, 6)
-	layout.Parent = listframe
 
 	toggle_button.Activated:Connect(function()
 		if next(currently_dragged) then return end
 		frame.Visible = not frame.Visible
 	end)
 
-	layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-		listframe.CanvasSize = UDim2.new(0,0,0,layout.AbsoluteContentSize.Y + 20)
-	end)
-
-	curr_frame = listframe
+	curr_mframe = frame
+	currtabframe = tabs_frame
+	currbuttonsframe = content_frame -- now default tab content lives here
 
 	return {
 		Root = frame,
-		ButtonsFrame = listframe
+		TabFrame = tabs_frame,
+		ContentFrame = content_frame
 	}
 end
 
-function NiceUI.create_click_button(name, callback)
+function NiceUI.create_tab(tab_name)
+	assert(curr_mframe, "create_gui() must be called first")
+	tab_name = tab_name or DEFAULT_TAB_NAME
+
+	if tabs[tab_name] then
+		return tabs[tab_name]
+	end
+
+	local tab_button
+	if tab_name ~= DEFAULT_TAB_NAME then
+		tab_button = Instance.new("TextButton")
+		tab_button.Text = tab_name
+		tab_button.Size = UDim2.new(1, -10, 0, 40)
+		tab_button.BackgroundTransparency = 0.4
+		tab_button.TextColor3 = Color3.new(1,1,1)
+		tab_button.Parent = currtabframe
+	end
+
+	local tab_window = Instance.new("Frame")
+	tab_window.Name = tab_name .. "_Window"
+	tab_window.Size = UDim2.new(1,0,1,0)
+	tab_window.BackgroundTransparency = 1
+	tab_window.Visible = false
+	tab_window.Parent = currbuttonsframe
+
+	local layout = Instance.new("UIListLayout")
+	layout.Padding = UDim.new(0,6)
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.Parent = tab_window
+
+	if tab_button then
+		tab_button.Activated:Connect(function()
+			if active_tab_window then active_tab_window.Visible = false end
+			active_tab_window = tab_window
+			tab_window.Visible = true
+		end)
+	end
+
+	-- auto-select first tab
+	if not active_tab_window then
+		active_tab_window = tab_window
+		tab_window.Visible = true
+	end
+
+	tabs[tab_name] = tab_window
+	return tab_window
+end
+
+local function get_tab_frame(tab)
+	if tab then
+		return NiceUI.create_tab(tab)
+	end
+	-- default tab
+	return NiceUI.create_tab(DEFAULT_TAB_NAME)
+end
+
+function NiceUI.create_click_button(name, tab, callback)
+	local parent_frame = get_tab_frame(tab)
 	local b = Instance.new("TextButton")
 	b.Name = name
 	b.Text = name
@@ -187,7 +263,7 @@ function NiceUI.create_click_button(name, callback)
 	b.BackgroundColor3 = Color3.fromRGB(0,0,0)
 	b.BackgroundTransparency = 0.4
 	b.TextColor3 = Color3.new(1,1,1)
-	b.Parent = curr_frame
+	b.Parent = parent_frame
 
 	b.MouseButton1Click:Connect(function()
 		if callback then callback() end
@@ -195,12 +271,13 @@ function NiceUI.create_click_button(name, callback)
 	return b
 end
 
-function NiceUI.create_slider(name, init_number, float_enabled, range, callback)
+function NiceUI.create_slider(name, init_number, float_enabled, range, tab, callback)
 	if not name then return end
 	if not range or type(range) ~= "table" or range[1] == nil or range[2] == nil then
 		notify("Slider requires a valid range with min and max values")
 		return
 	end
+	local parent_frame = get_tab_frame(tab)
 	local min_val = range[1] :: number
 	local max_val = range[2] :: number
 	local current_val = init_number or min_val :: number
@@ -210,10 +287,10 @@ function NiceUI.create_slider(name, init_number, float_enabled, range, callback)
 	end
 	local slide_frame = Instance.new("Frame")
 	slide_frame.Name = tostring(name)
-	slide_frame.Size = UDim2.new(0, 200, 0, 50)
+	slide_frame.Size = UDim2.new(1, -20, 0, 50)
 	slide_frame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 	slide_frame.BorderSizePixel = 1
-	slide_frame.Parent = curr_frame
+	slide_frame.Parent = parent_frame
 	local title = Instance.new("TextLabel")
 	title.Name = "Title"
 	title.Size = UDim2.new(1, -10, 0, 10)
@@ -276,14 +353,15 @@ function NiceUI.create_slider(name, init_number, float_enabled, range, callback)
 	return slide_frame
 end
 
-function NiceUI.create_text_editor(name, text, callback)
+function NiceUI.create_text_editor(name, text, tab, callback)
 	if not name then return end
+	local parent_frame = get_tab_frame(tab)
 	local te_frame = Instance.new("Frame")
 	te_frame.Name = tostring(name)
-	te_frame.Size = UDim2.new(0, 200, 0, 50)
+	te_frame.Size = UDim2.new(1, -20, 0, 50)
 	te_frame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 	te_frame.BorderSizePixel = 1
-	te_frame.Parent = curr_frame
+	te_frame.Parent = parent_frame
 	local title = Instance.new("TextLabel")
 	title.Name = "Title"
 	title.Size = UDim2.new(1, -10, 0, 10)
