@@ -168,6 +168,30 @@ local function create_styles(item)
 	UI_Gradient.Parent = item
 end
 
+local function normalize_list(list)
+	local out = {}
+
+	-- EnumItems
+	if typeof(list) == "Enum" then
+		for _, item in ipairs(list:GetEnumItems()) do
+			table.insert(out, item)
+		end
+		return out
+	end
+
+	-- EnumItem array
+	if typeof(list[1]) == "EnumItem" then
+		return list
+	end
+
+	-- Normal table
+	for _, v in pairs(list) do
+		table.insert(out, v)
+	end
+
+	return out
+end
+
 playsound(sound_files.startup, 1)
 
 local curr_mframe
@@ -273,9 +297,11 @@ function NiceUI.create_tab(tab_name)
 	if tab_name ~= DEFAULT_TAB_NAME then
 		tab_button = Instance.new("TextButton")
 		tab_button.Text = tab_name
-		tab_button.Size = UDim2.new(1, -10, 0, 40)
+		tab_button.Size = UDim2.new(1, 0, 0, 40)
 		tab_button.BackgroundTransparency = 0.4
 		tab_button.TextColor3 = Color3.new(1,1,1)
+		tab_button.TextScaled = true
+		tab_button.Font = Enum.Font.SourceSans
 		tab_button.Parent = currtabframe
 	end
 
@@ -285,6 +311,7 @@ function NiceUI.create_tab(tab_name)
 	tab_window.BackgroundTransparency = 1
 	tab_window.Visible = false
 	tab_window.Parent = currbuttonsframe
+	create_styles(tab_button)
 
 	local layout = Instance.new("UIListLayout")
 	layout.Padding = UDim.new(0,6)
@@ -322,6 +349,7 @@ function NiceUI.create_click_button(name, tab, callback)
 	local b = Instance.new("TextButton")
 	b.Name = name
 	b.Text = name
+	b.TextScaled = true
 	b.Size = UDim2.new(1, -10, 0, 40)
 	b.BackgroundColor3 = Color3.fromRGB(0,0,0)
 	b.BackgroundTransparency = 0.4
@@ -331,6 +359,7 @@ function NiceUI.create_click_button(name, tab, callback)
 	b.MouseButton1Click:Connect(function()
 		if callback then callback() end
 	end)
+	create_styles(b)
 	return b
 end
 
@@ -415,6 +444,7 @@ function NiceUI.create_slider(name, init_number, float_enabled, range, tab, call
 			set_drag_lock(false)
 		end
 	end)
+	create_styles(slide_frame)
 	return slide_frame
 end
 
@@ -446,6 +476,8 @@ function NiceUI.create_text_editor(name, text, tab, callback)
 	text_editor.TextScaled = true
 	text_editor.ClearTextOnFocus = false
 	text_editor.Parent = te_frame
+	create_styles(te_frame)
+	create_styles(text_editor)
 	text_editor.FocusLost:Connect(function()
 		local new_text = text_editor.Text
 		if callback then
@@ -453,6 +485,131 @@ function NiceUI.create_text_editor(name, text, tab, callback)
 		end
 	end)
 	return te_frame
+end
+
+function NiceUI.create_item_picker(name, items, default, tab, callback)
+	if not name or not items then return end
+
+	local parent_frame = get_tab_frame(tab)
+	local list = normalize_list(items)
+
+	local selected = default or list[1]
+
+	-- Root frame
+	local picker_frame = Instance.new("Frame")
+	picker_frame.Name = tostring(name)
+	picker_frame.Size = UDim2.new(1, -20, 0, 80)
+	picker_frame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+	picker_frame.BorderSizePixel = 1
+	picker_frame.Parent = parent_frame
+
+	local title = Instance.new("TextLabel")
+	title.Name = "Title"
+	title.Size = UDim2.new(1, -10, 0, 10)
+	title.Position = UDim2.new(0, 5, 0, 0)
+	title.BackgroundTransparency = 1
+	title.Text = name
+	title.TextScaled = true
+	title.TextColor3 = Color3.new(1,1,1)
+	title.Parent = picker_frame
+
+	-- Button
+	local button = Instance.new("TextButton")
+	button.Size = UDim2.new(1, -10, 1, -20)
+	button.Position = UDim2.new(0, 5, 0, 15)
+	button.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+	button.TextColor3 = Color3.new(1,1,1)
+	button.TextScaled = true
+	button.TextXAlignment = Enum.TextXAlignment.Left
+	button.Text = tostring(selected)
+	button.Parent = picker_frame
+
+	-- Dropdown
+	local dropdown = Instance.new("ScrollingFrame")
+	dropdown.Visible = false
+	dropdown.Size = UDim2.new(1, -10, 0, 120)
+	dropdown.Position = UDim2.new(0, 5, 1, 5)
+	dropdown.CanvasSize = UDim2.new()
+	dropdown.ScrollBarThickness = 6
+	dropdown.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+	dropdown.BorderSizePixel = 1
+	dropdown.ZIndex = picker_frame.ZIndex + 5
+	dropdown.Parent = picker_frame
+
+	local layout = Instance.new("UIListLayout")
+	layout.Padding = UDim.new(0, 4)
+	layout.Parent = dropdown
+
+	create_styles(picker_frame)
+	create_styles(button)
+	create_styles(dropdown)
+
+	layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+		dropdown.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 6)
+	end)
+
+	local function close()
+		dropdown.Visible = false
+		set_drag_lock(false)
+	end
+
+	-- Populate items
+	for _, item in ipairs(list) do
+		local b = Instance.new("TextButton")
+		b.Size = UDim2.new(1, -8, 0, 30)
+		b.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+		b.TextColor3 = Color3.new(1,1,1)
+		b.TextScaled = true
+		b.Text = tostring(item)
+		b.Parent = dropdown
+
+		b.MouseButton1Click:Connect(function()
+			selected = item
+			button.Text = tostring(item)
+			close()
+			if callback then
+				callback(item)
+			end
+		end)
+	end
+
+	-- Toggle dropdown
+	button.MouseButton1Click:Connect(function()
+		dropdown.Visible = not dropdown.Visible
+		set_drag_lock(dropdown.Visible, "picker")
+	end)
+
+	local hover_count = 0
+
+	local function entered()
+		hover_count += 1
+	end
+
+	local function left()
+		hover_count -= 1
+		task.delay(0.05, function()
+			if hover_count <= 0 and dropdown.Visible then
+				close()
+			end
+		end)
+	end
+
+	-- Picker root
+	picker_frame.MouseEnter:Connect(entered)
+	picker_frame.MouseLeave:Connect(left)
+
+	-- Dropdown itself
+	dropdown.MouseEnter:Connect(entered)
+	dropdown.MouseLeave:Connect(left)
+
+	return {
+		Frame = picker_frame,
+		Get = function() return selected end,
+		Set = function(v)
+			selected = v
+			button.Text = tostring(v)
+		end
+	}
 end
 
 function NiceUI.display_message(customtitle, customtext, customsound)
