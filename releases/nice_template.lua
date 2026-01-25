@@ -50,6 +50,10 @@ gui.DisplayOrder = math.pow(2,16)
 gui.Parent = PARENT
 
 local currently_dragged = {}
+local drag_lock = {
+	locked = false,
+	reason = nil -- optional (slider, modal, etc.)
+}
 
 local function playsound(id, volume)
 	local s = Instance.new("Sound")
@@ -71,7 +75,7 @@ local function notify(title, text, dur, no_sound)
 	end
 end
 
-local smoothSpeed = 0.5 -- lower = smoother, higher = snappier
+local smoothSpeed = 0.3 -- lower = smoother, higher = snappier
 
 local function make_draggable(item)
 	local targetPos
@@ -81,6 +85,7 @@ local function make_draggable(item)
 	local holdStartTime = nil
 	local holdConnection = nil
 	item.InputBegan:Connect(function(input)
+		if drag_lock.locked then return end
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 			holdStartTime = tick()
 			dragStart = input.Position
@@ -113,7 +118,8 @@ local function make_draggable(item)
 		end
 	end)
 	UserInputService.InputChanged:Connect(function(input)
-		if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+		if dragging and not drag_lock.locked and 
+			(input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
 			local delta = input.Position - dragStart
 			targetPos = UDim2.new(
 				startPos.X.Scale, startPos.X.Offset + delta.X,
@@ -122,10 +128,19 @@ local function make_draggable(item)
 		end
 	end)
 	RunService.RenderStepped:Connect(function()
-		if dragging and targetPos then
+		if dragging and targetPos and not drag_lock.locked then
 			item.Position = item.Position:Lerp(targetPos, smoothSpeed)
 		end
 	end)
+end
+
+local function is_drag_locked()
+	return drag_lock.locked, drag_lock.reason
+end
+
+local function set_drag_lock(state, reason)
+	drag_lock.locked = state and true or false
+	drag_lock.reason = state and (reason or "unknown") or nil
 end
 
 local function create_styles(item)
@@ -386,6 +401,7 @@ function NiceUI.create_slider(name, init_number, float_enabled, range, tab, call
 	slider_handle.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
 			dragging = true
+			set_drag_lock(true, "slider")
 		end
 	end)
 	UserInputService.InputChanged:Connect(function(input)
@@ -396,6 +412,7 @@ function NiceUI.create_slider(name, init_number, float_enabled, range, tab, call
 	slider_handle.InputEnded:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
 			dragging = false
+			set_drag_lock(false)
 		end
 	end)
 	return slide_frame
