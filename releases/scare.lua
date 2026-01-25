@@ -130,9 +130,23 @@ local b_scare = NiceGui.create_click_button("Scare target", "Targets", function(
 	scare_function(targetPLR) 
 end)
 
-local b_scare_random = NiceGui.create_click_button("Scare a random player", "Targets", function() 
-	local random_player = Players:GetPlayers()[math.random(1, #Players:GetPlayers())] 
-	if random_player then 
-		scare_function(random_player.Name) 
-	end 
+local b_scare_random = NiceGui.create_click_button("Scare a random player", "Targets", function()
+	local players = Players:GetPlayers()
+	local valid = {}
+
+	for _, plr in ipairs(players) do
+		if plr ~= Players.LocalPlayer then
+			table.insert(valid, plr)
+		end
+	end
+
+	if #valid > 0 then
+		local random_player = valid[math.random(1, #valid)]
+		scare_function(random_player.Name)
+	end
+end)
+
+local b_instaleave = NiceGui.create_click_button("Instant leave", "Miscellaneous", function()
+	local plr = Players.LocalPlayer
+	plr:Kick("Instant left the game.")
 end)
