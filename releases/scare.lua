@@ -52,7 +52,7 @@ local Keybinds = {
 	ctrl_required_for_target = true
 }
 
-local key_items = enum:GetEnumItems()
+local key_items = Enum.KeyCode:GetEnumItems()
 
 NiceGui.create_item_picker(
 	"Random Scare Key",
