@@ -71,7 +71,10 @@ local function notify(title, text, dur, no_sound)
 	end
 end
 
+local smoothSpeed = 0.5 -- lower = smoother, higher = snappier
+
 local function make_draggable(item)
+	local targetPos
 	local dragging = false
 	local dragStart = nil
 	local startPos = nil
@@ -83,7 +86,7 @@ local function make_draggable(item)
 			dragStart = input.Position
 			startPos = item.Position
 			holdConnection = RunService.RenderStepped:Connect(function()
-				if not dragging and (tick() - holdStartTime) >= 1 then
+				if not dragging and (tick() - holdStartTime) >= 0.2 then
 					notify("Drag feature", "you can now drag "..(item.Name or "this UI").." anywhere.", 1.5)
 					dragging = true
 					currently_dragged[item] = true
@@ -101,7 +104,7 @@ local function make_draggable(item)
 					end
 					if dragging then
 						dragging = false
-						task.delay(0.5, function()
+						task.delay(0.2, function()
 							currently_dragged[item] = nil
 						end)
 					end
@@ -112,14 +115,42 @@ local function make_draggable(item)
 	UserInputService.InputChanged:Connect(function(input)
 		if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
 			local delta = input.Position - dragStart
-			local newXOffset = (startPos.X.Offset + delta.X) or startPos.X.Offset
-			local newYOffset = (startPos.Y.Offset + delta.Y) or startPos.Y.Offset
-			item.Position = UDim2.new(
-				startPos.X.Scale, newXOffset,
-				startPos.Y.Scale, newYOffset
+			targetPos = UDim2.new(
+				startPos.X.Scale, startPos.X.Offset + delta.X,
+				startPos.Y.Scale, startPos.Y.Offset + delta.Y
 			)
 		end
 	end)
+	RunService.RenderStepped:Connect(function()
+		if dragging and targetPos then
+			item.Position = item.Position:Lerp(targetPos, smoothSpeed)
+		end
+	end)
+end
+
+local function create_styles(item)
+	local UI_Corner = Instance.new("UICorner")
+	UI_Corner.CornerRadius = UDim.new(0, 10)
+	UI_Corner.Parent = item
+	local UI_Padding = Instance.new("UIPadding")
+	UI_Padding.PaddingLeft = UDim.new(0, 10)
+	UI_Padding.PaddingRight = UDim.new(0, 10)
+	UI_Padding.PaddingTop = UDim.new(0, 10)
+	UI_Padding.PaddingBottom = UDim.new(0, 10)
+	UI_Padding.Parent = item
+	local UI_Stroke = Instance.new("UIStroke")
+	UI_Stroke.Color = Color3.fromRGB(255,255,255)
+	UI_Stroke.Thickness = 2
+	UI_Stroke.Transparency = 0.5
+	UI_Stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	UI_Stroke.Parent = item
+	local UI_Gradient = Instance.new("UIGradient")
+	UI_Gradient.Color = ColorSequence.new{
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(255,255,255)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(161, 161, 161))
+	}
+	UI_Gradient.Rotation = 90
+	UI_Gradient.Parent = item
 end
 
 playsound(sound_files.startup, 1)
@@ -131,22 +162,31 @@ local tabs = {}
 local active_tab_window = nil
 local DEFAULT_TAB_NAME = "Uncategorized"
 
-function NiceUI.create_gui(name)
+local themes = {
+	["Default"] = {
+		["PrimeColorLight"] = Color3.fromRGB(20, 110, 255),
+		["PrimeColorDark"] = Color3.fromRGB(0, 67, 126),
+		["AccentColor"] = Color3.fromRGB(0, 255, 255),
+		["TextColor"] = Color3.fromRGB(0, 0, 0),
+	},
+}
+
+function NiceUI.create_gui(name, gui_smoothness)
 	local frame = Instance.new("Frame")
 	frame.Name = name
 	frame.Size = UDim2.new(0, 500, 0, 300)
 	frame.Position = UDim2.new(0.5, 0, 0.4, 0)
 	frame.AnchorPoint = Vector2.new(0.5, 0.5)
-	frame.BackgroundColor3 = Color3.fromRGB(0,0,0)
+	frame.BackgroundColor3 = Color3.fromRGB(20, 110, 255)
 	frame.BackgroundTransparency = 0.4
 	frame.Parent = gui
 
 	-- Tabs column
 	local tabs_frame = Instance.new("ScrollingFrame")
 	tabs_frame.Name = "Tabs"
-	tabs_frame.Size = UDim2.new(0, 100, 1, 0)
+	tabs_frame.Size = UDim2.new(0, 145, 1, 0)
 	tabs_frame.Position = UDim2.new(0, 0, 0, 0)
-	tabs_frame.BackgroundColor3 = Color3.fromRGB(0,0,0)
+	tabs_frame.BackgroundColor3 = Color3.fromRGB(20, 110, 255)
 	tabs_frame.BackgroundTransparency = 0.4
 	tabs_frame.ScrollBarThickness = 6
 	tabs_frame.Parent = frame
@@ -163,12 +203,10 @@ function NiceUI.create_gui(name)
 	-- Content area for all tabs
 	local content_frame = Instance.new("Frame")
 	content_frame.Name = "Content"
-	content_frame.Size = UDim2.new(1, -100, 1, 0)
-	content_frame.Position = UDim2.new(0, 100, 0, 0)
+	content_frame.Size = UDim2.new(1, -155, 1, 0)
+	content_frame.Position = UDim2.new(0, 155, 0, 0)
 	content_frame.BackgroundTransparency = 1
 	content_frame.Parent = frame
-
-	make_draggable(frame)
 
 	local toggle_button = Instance.new("TextButton")
 	toggle_button.Name = "Toggle"
@@ -176,16 +214,26 @@ function NiceUI.create_gui(name)
 	toggle_button.Size = UDim2.new(0, 80, 0, 40)
 	toggle_button.Position = UDim2.new(0.5, 0, 0, 50)
 	toggle_button.AnchorPoint = Vector2.new(0.5,0.5)
-	toggle_button.BackgroundColor3 = Color3.fromRGB(0,0,0)
+	toggle_button.BackgroundColor3 = Color3.fromRGB(20, 110, 255)
 	toggle_button.BackgroundTransparency = 0.4
 	toggle_button.TextColor3 = Color3.new(1,1,1)
 	toggle_button.Parent = gui
+
+	create_styles(tabs_frame)
+	create_styles(content_frame)
+	make_draggable(frame)
+	create_styles(frame)
 	make_draggable(toggle_button)
+	create_styles(toggle_button)
 
 	toggle_button.Activated:Connect(function()
 		if next(currently_dragged) then return end
 		frame.Visible = not frame.Visible
 	end)
+
+	if gui_smoothness and typeof(gui_smoothness) == "number" then
+		smoothSpeed = gui_smoothness
+	end
 
 	curr_mframe = frame
 	currtabframe = tabs_frame
