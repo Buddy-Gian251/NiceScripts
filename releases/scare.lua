@@ -46,6 +46,33 @@ local gui = NiceGui.create_gui("niceScare")
 
 local currently_dragged = {}
 local scaring = _G.NICE_SCARE.scaring or false
+local Keybinds = {
+	scare_random = Enum.KeyCode.R,
+	scare_target = Enum.KeyCode.R,
+	ctrl_required_for_target = true
+}
+
+local key_items = enum:GetEnumItems()
+
+NiceGui.create_item_picker(
+	"Random Scare Key",
+	key_items,
+	Keybinds.scare_random,
+	"Keybinds",
+	function(v)
+		Keybinds.scare_random = v
+	end
+)
+
+NiceGui.create_item_picker(
+	"Target Scare Key",
+	key_items,
+	Keybinds.scare_target,
+	"Keybinds",
+	function(v)
+		Keybinds.scare_target = v
+	end
+)
 
 local playsound = function(id, vol)
 	if not id or id == "" then warn("no id") return end
@@ -149,4 +176,42 @@ end)
 local b_instaleave = NiceGui.create_click_button("Instant leave", "Miscellaneous", function()
 	local plr = Players.LocalPlayer
 	plr:Kick("Instant left the game.")
+end)
+
+UserInputService.InputBegan:Connect(function(input, gpe)
+	if gpe or scaring then return end
+	if input.UserInputType ~= Enum.UserInputType.Keyboard then return end
+
+	local ctrl =
+		UserInputService:IsKeyDown(Enum.KeyCode.LeftControl)
+		or UserInputService:IsKeyDown(Enum.KeyCode.RightControl)
+
+	-- CTRL + key → target scare
+	if ctrl and input.KeyCode == Keybinds.scare_target then
+		if targetPLR ~= "" then
+			scare_function(targetPLR)
+		else
+			custom_warn("No target player set")
+		end
+		return
+	end
+
+	-- key alone → random scare
+	if not ctrl and input.KeyCode == Keybinds.scare_random then
+		local players = Players:GetPlayers()
+		local valid = {}
+
+		for _, plr in ipairs(players) do
+			if plr ~= Players.LocalPlayer then
+				table.insert(valid, plr)
+			end
+		end
+
+		if #valid > 0 then
+			local random_player = valid[math.random(1, #valid)]
+			scare_function(random_player.Name)
+		else
+			custom_warn("No valid players to scare")
+		end
+	end
 end)
