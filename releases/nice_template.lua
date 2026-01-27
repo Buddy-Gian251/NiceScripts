@@ -65,13 +65,18 @@ local function playsound(id, volume)
 end
 
 local function notify(title, text, dur, no_sound)
-	StarterGui:SetCore("SendNotification", {
-		Title = title,
-		Text = text,
-		Duration = dur or 2
-	})
+	local s, e = pcall(function()
+		StarterGui:SetCore("SendNotification", {
+			Title = title,
+			Text = text,
+			Duration = dur or 2
+		})
+	end)
 	if not no_sound then
 		playsound(sound_files.notif, 2)
+	end
+	if not s then
+		warn("NiceGUI: "..tostring(e))
 	end
 end
 
@@ -213,18 +218,30 @@ local themes = {
 function NiceUI.create_gui(name, gui_smoothness)
 	local frame = Instance.new("Frame")
 	frame.Name = name
-	frame.Size = UDim2.new(0, 500, 0, 300)
+	frame.Size = UDim2.new(0, 500, 0, 320)
 	frame.Position = UDim2.new(0.5, 0, 0.4, 0)
 	frame.AnchorPoint = Vector2.new(0.5, 0.5)
 	frame.BackgroundColor3 = Color3.fromRGB(20, 110, 255)
 	frame.BackgroundTransparency = 0.4
 	frame.Parent = gui
 
+	-- Title
+	local title = Instance.new("TextLabel")
+	title.Name = "Title"
+	title.Size = UDim2.new(1, 0, 0, 20)
+	title.Position = UDim2.new(0, 0, 0, 0)
+	title.Text = "niceGui: "..name
+	title.BackgroundTransparency = 1
+	title.TextColor3 = Color3.fromRGB(255, 255, 255)
+	title.TextSize = 20
+	title.Font = Enum.Font.GothamBold
+	title.Parent = frame
+
 	-- Tabs column
 	local tabs_frame = Instance.new("ScrollingFrame")
 	tabs_frame.Name = "Tabs"
-	tabs_frame.Size = UDim2.new(0, 145, 1, 0)
-	tabs_frame.Position = UDim2.new(0, 0, 0, 0)
+	tabs_frame.Size = UDim2.new(0, 145, 1, -20)
+	tabs_frame.Position = UDim2.new(0, 0, 0, 20)
 	tabs_frame.BackgroundColor3 = Color3.fromRGB(20, 110, 255)
 	tabs_frame.BackgroundTransparency = 0.4
 	tabs_frame.ScrollBarThickness = 6
@@ -242,8 +259,8 @@ function NiceUI.create_gui(name, gui_smoothness)
 	-- Content area for all tabs
 	local content_frame = Instance.new("Frame")
 	content_frame.Name = "Content"
-	content_frame.Size = UDim2.new(1, -155, 1, 0)
-	content_frame.Position = UDim2.new(0, 155, 0, 0)
+	content_frame.Size = UDim2.new(1, -155, 1, -20)
+	content_frame.Position = UDim2.new(0, 155, 0, 20)
 	content_frame.BackgroundTransparency = 1
 	content_frame.Parent = frame
 
@@ -278,11 +295,7 @@ function NiceUI.create_gui(name, gui_smoothness)
 	currtabframe = tabs_frame
 	currbuttonsframe = content_frame -- now default tab content lives here
 
-	return {
-		Root = frame,
-		TabFrame = tabs_frame,
-		ContentFrame = content_frame
-	}
+	return gui
 end
 
 function NiceUI.create_tab(tab_name)
@@ -379,7 +392,7 @@ function NiceUI.create_slider(name, init_number, float_enabled, range, tab, call
 	end
 	local slide_frame = Instance.new("Frame")
 	slide_frame.Name = tostring(name)
-	slide_frame.Size = UDim2.new(1, -20, 0, 50)
+	slide_frame.Size = UDim2.new(1, 0, 0, 50)
 	slide_frame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 	slide_frame.BorderSizePixel = 1
 	slide_frame.Parent = parent_frame
@@ -453,7 +466,7 @@ function NiceUI.create_text_editor(name, text, tab, callback)
 	local parent_frame = get_tab_frame(tab)
 	local te_frame = Instance.new("Frame")
 	te_frame.Name = tostring(name)
-	te_frame.Size = UDim2.new(1, -20, 0, 50)
+	te_frame.Size = UDim2.new(1, 0, 0, 70)
 	te_frame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 	te_frame.BorderSizePixel = 1
 	te_frame.Parent = parent_frame
@@ -515,7 +528,7 @@ function NiceUI.create_item_picker(name, items, default, tab, callback)
 
 	-- Button
 	local button = Instance.new("TextButton")
-	button.Size = UDim2.new(1, -10, 1, -20)
+	button.Size = UDim2.new(1, -10, 0, 40)
 	button.Position = UDim2.new(0, 5, 0, 15)
 	button.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
 	button.TextColor3 = Color3.new(1,1,1)
@@ -528,7 +541,7 @@ function NiceUI.create_item_picker(name, items, default, tab, callback)
 	local dropdown = Instance.new("ScrollingFrame")
 	dropdown.Visible = false
 	dropdown.Size = UDim2.new(1, -10, 0, 120)
-	dropdown.Position = UDim2.new(0, 5, 1, 5)
+	dropdown.Position = UDim2.new(0, 5, 0, 45)
 	dropdown.CanvasSize = UDim2.new()
 	dropdown.ScrollBarThickness = 6
 	dropdown.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
@@ -550,6 +563,7 @@ function NiceUI.create_item_picker(name, items, default, tab, callback)
 
 	local function close()
 		dropdown.Visible = false
+		picker_frame.Size = UDim2.new(1, -20, 0, 80)
 		set_drag_lock(false)
 	end
 
@@ -573,34 +587,11 @@ function NiceUI.create_item_picker(name, items, default, tab, callback)
 		end)
 	end
 
-	-- Toggle dropdown
 	button.MouseButton1Click:Connect(function()
 		dropdown.Visible = not dropdown.Visible
+		picker_frame.Size = UDim2.new(1, -20, 0, 320)
 		set_drag_lock(dropdown.Visible, "picker")
 	end)
-
-	local hover_count = 0
-
-	local function entered()
-		hover_count += 1
-	end
-
-	local function left()
-		hover_count -= 1
-		task.delay(0.05, function()
-			if hover_count <= 0 and dropdown.Visible then
-				close()
-			end
-		end)
-	end
-
-	-- Picker root
-	picker_frame.MouseEnter:Connect(entered)
-	picker_frame.MouseLeave:Connect(left)
-
-	-- Dropdown itself
-	dropdown.MouseEnter:Connect(entered)
-	dropdown.MouseLeave:Connect(left)
 
 	return {
 		Frame = picker_frame,
