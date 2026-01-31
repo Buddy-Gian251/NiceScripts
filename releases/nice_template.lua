@@ -244,17 +244,8 @@ function NiceUI.create_gui(name, gui_smoothness)
 	tabs_frame.Position = UDim2.new(0, 0, 0, 20)
 	tabs_frame.BackgroundColor3 = Color3.fromRGB(20, 110, 255)
 	tabs_frame.BackgroundTransparency = 0.4
-	tabs_frame.ScrollBarThickness = 6
+	tabs_frame.ClipsDescendants = true
 	tabs_frame.Parent = frame
-
-	local tabs_layout = Instance.new("UIListLayout")
-	tabs_layout.SortOrder = Enum.SortOrder.LayoutOrder
-	tabs_layout.Padding = UDim.new(0,6)
-	tabs_layout.Parent = tabs_frame
-
-	tabs_layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-		tabs_frame.CanvasSize = UDim2.new(0,0,0,tabs_layout.AbsoluteContentSize.Y + 10)
-	end)
 
 	-- Content area for all tabs
 	local content_frame = Instance.new("Frame")
@@ -274,6 +265,14 @@ function NiceUI.create_gui(name, gui_smoothness)
 	toggle_button.BackgroundTransparency = 0.4
 	toggle_button.TextColor3 = Color3.new(1,1,1)
 	toggle_button.Parent = gui
+
+	local tabs_layout = Instance.new("UIListLayout") 
+	tabs_layout.SortOrder = Enum.SortOrder.LayoutOrder 
+	tabs_layout.Padding = UDim.new(0,6) 
+	tabs_layout.Parent = tabs_frame 
+	tabs_layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() 
+		tabs_frame.CanvasSize = UDim2.new(0,0,0,tabs_layout.AbsoluteContentSize.Y + 10) 
+	end)
 
 	create_styles(tabs_frame)
 	create_styles(content_frame)
@@ -318,12 +317,32 @@ function NiceUI.create_tab(tab_name)
 		tab_button.Parent = currtabframe
 	end
 
-	local tab_window = Instance.new("Frame")
+	local tab_window = Instance.new("ScrollingFrame")
 	tab_window.Name = tab_name .. "_Window"
-	tab_window.Size = UDim2.new(1,0,1,0)
+	tab_window.Size = UDim2.new(1, 0, 1, 0)
+	tab_window.CanvasSize = UDim2.new(0, 0, 0, 0)
+	tab_window.ScrollBarThickness = 6
+	tab_window.ScrollingDirection = Enum.ScrollingDirection.Y
+	tab_window.AutomaticCanvasSize = Enum.AutomaticSize.None
 	tab_window.BackgroundTransparency = 1
 	tab_window.Visible = false
+	tab_window.ClipsDescendants = true
+	tab_window.VerticalScrollBarInset = Enum.ScrollBarInset.Always
+	tab_window.HorizontalScrollBarInset = Enum.ScrollBarInset.Always
 	tab_window.Parent = currbuttonsframe
+	local layout = Instance.new("UIListLayout")
+	layout.Padding = UDim.new(0,10)
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.Parent = tab_window
+	layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+		tab_window.CanvasSize = UDim2.new(
+			0,
+			0,
+			0,
+			layout.AbsoluteContentSize.Y + 10
+		)
+	end)
+
 	create_styles(tab_button)
 
 	local layout = Instance.new("UIListLayout")
@@ -363,7 +382,7 @@ function NiceUI.create_click_button(name, tab, callback)
 	b.Name = name
 	b.Text = name
 	b.TextScaled = true
-	b.Size = UDim2.new(1, -10, 0, 40)
+	b.Size = UDim2.new(1, 0, 0, 40)
 	b.BackgroundColor3 = Color3.fromRGB(0,0,0)
 	b.BackgroundTransparency = 0.4
 	b.TextColor3 = Color3.new(1,1,1)
@@ -382,82 +401,150 @@ function NiceUI.create_slider(name, init_number, float_enabled, range, tab, call
 		notify("Slider requires a valid range with min and max values")
 		return
 	end
+
 	local parent_frame = get_tab_frame(tab)
+
 	local min_val = range[1] :: number
 	local max_val = range[2] :: number
-	local current_val = init_number or min_val :: number
+
+	if not min_val or not max_val then notify("Error", "Expected 2 arguments but nothing was filled in.", 5) return end
+	if type(min_val) ~= "number" or type(max_val) ~= "number" then notify("Error", "Expected 2 arguments but left with incorrect type/s.", 5) return end
+
+	local current_val = init_number or min_val
+	local last_snapped_val = current_val
 	current_val = math.clamp(current_val, min_val, max_val)
 	if not float_enabled then
 		current_val = math.floor(current_val + 0.5)
 	end
+
+	-- ===== UI =====
 	local slide_frame = Instance.new("Frame")
 	slide_frame.Name = tostring(name)
 	slide_frame.Size = UDim2.new(1, 0, 0, 50)
 	slide_frame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 	slide_frame.BorderSizePixel = 1
 	slide_frame.Parent = parent_frame
+
 	local title = Instance.new("TextLabel")
-	title.Name = "Title"
-	title.Size = UDim2.new(1, -10, 0, 10)
+	title.Size = UDim2.new(0.5, -10, 0, 10)
 	title.Position = UDim2.new(0, 5, 0, 0)
 	title.BackgroundTransparency = 1
 	title.Text = name
 	title.TextScaled = true
 	title.TextColor3 = Color3.new(1,1,1)
 	title.Parent = slide_frame
+
+	local input_box = Instance.new("TextBox")
+	input_box.Size = UDim2.new(0.5, -10, 0, 10)
+	input_box.Position = UDim2.new(0.5, 5, 0, 0)
+	input_box.BackgroundTransparency = 1
+	input_box.TextScaled = true
+	input_box.TextColor3 = Color3.new(1,1,1)
+	input_box.ClearTextOnFocus = false
+	input_box.Parent = slide_frame
+
 	local slider_bar = Instance.new("Frame")
 	slider_bar.Size = UDim2.new(1, -20, 0, 6)
 	slider_bar.Position = UDim2.new(0, 10, 0, 24)
 	slider_bar.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
 	slider_bar.Parent = slide_frame
+
 	local slider_handle = Instance.new("Frame")
 	slider_handle.Size = UDim2.new(0, 12, 0, 12)
-	slider_handle.AnchorPoint = Vector2.new(0, 0.5)
+	slider_handle.AnchorPoint = Vector2.new(0.5, 0.5)
+	slider_handle.Position = UDim2.new(0, 0, 0.5, -6)
 	slider_handle.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
+	slider_handle.BackgroundTransparency = 0.5
 	slider_handle.Parent = slider_bar
+
+	create_styles(slide_frame)
+
+	-- ===== Logic =====
 	local dragging = false
-	local function update_value(input_position)
-		local relative_x = math.clamp(input_position.X - slider_bar.AbsolutePosition.X, 0, slider_bar.AbsoluteSize.X)
-		local percent = relative_x / slider_bar.AbsoluteSize.X
-		local raw_val = min_val + (max_val - min_val) * percent
-		if not float_enabled then
-			current_val = math.floor(raw_val + 0.5)
-			local snapped_percent = (current_val - min_val) / (max_val - min_val)
-			slider_handle.Position = UDim2.new(snapped_percent, 0, 0.5, -6)
+	local syncing = false
+
+	local function format_value(v)
+		if float_enabled then
+			return string.format("%.2f", v)
 		else
-			current_val = raw_val
-			slider_handle.Position = UDim2.new(percent, 0, 0.5, -6)
-		end
-		if callback then
-			callback(current_val)
+			return tostring(v)
 		end
 	end
-	task.defer(function()
+
+	local function set_value(new_val)
+		if syncing then return end
+		syncing = true
+
+		new_val = math.clamp(new_val, min_val, max_val)
+
+		-- snap logic
+		if not float_enabled then
+			new_val = math.floor(new_val + 0.5)
+		end
+
+		-- 🔊 play sound ONLY if snapped value changed
+		if new_val ~= last_snapped_val then
+			playsound("rbxassetid://14133663945", 5)
+			last_snapped_val = new_val
+		end
+
+		current_val = new_val
+
 		local percent = (current_val - min_val) / (max_val - min_val)
 		slider_handle.Position = UDim2.new(percent, 0, 0.5, -6)
+		input_box.Text = format_value(current_val)
 
 		if callback then
 			callback(current_val)
 		end
-	end)
+
+		syncing = false
+	end
+
+	-- ===== Slider drag =====
 	slider_handle.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
 			dragging = true
 			set_drag_lock(true, "slider")
 		end
 	end)
+
 	UserInputService.InputChanged:Connect(function(input)
 		if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-			update_value(input.Position)
+			local relative_x = math.clamp(
+				input.Position.X - slider_bar.AbsolutePosition.X,
+				0,
+				slider_bar.AbsoluteSize.X
+			)
+
+			local percent = relative_x / slider_bar.AbsoluteSize.X
+			local raw_val = min_val + (max_val - min_val) * percent
+			set_value(raw_val)
 		end
 	end)
+
 	slider_handle.InputEnded:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
 			dragging = false
 			set_drag_lock(false)
 		end
 	end)
-	create_styles(slide_frame)
+
+	-- ===== TextBox → slider =====
+	input_box.FocusLost:Connect(function()
+		local num = tonumber(input_box.Text)
+		if num then
+			set_value(num)
+		else
+			input_box.Text = format_value(current_val)
+		end
+	end)
+
+	-- ===== Initial sync =====
+	task.defer(function()
+		set_value(current_val)
+	end)
+
 	return slide_frame
 end
 
@@ -511,7 +598,7 @@ function NiceUI.create_item_picker(name, items, default, tab, callback)
 	-- Root frame
 	local picker_frame = Instance.new("Frame")
 	picker_frame.Name = tostring(name)
-	picker_frame.Size = UDim2.new(1, -20, 0, 80)
+	picker_frame.Size = UDim2.new(1, 0, 0, 80)
 	picker_frame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 	picker_frame.BorderSizePixel = 1
 	picker_frame.Parent = parent_frame
@@ -540,8 +627,8 @@ function NiceUI.create_item_picker(name, items, default, tab, callback)
 	-- Dropdown
 	local dropdown = Instance.new("ScrollingFrame")
 	dropdown.Visible = false
-	dropdown.Size = UDim2.new(1, -10, 0, 120)
-	dropdown.Position = UDim2.new(0, 5, 0, 45)
+	dropdown.Size = UDim2.new(1, -10, 0, 140)
+	dropdown.Position = UDim2.new(0, 5, 0, 70)
 	dropdown.CanvasSize = UDim2.new()
 	dropdown.ScrollBarThickness = 6
 	dropdown.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
@@ -589,7 +676,7 @@ function NiceUI.create_item_picker(name, items, default, tab, callback)
 
 	button.MouseButton1Click:Connect(function()
 		dropdown.Visible = not dropdown.Visible
-		picker_frame.Size = UDim2.new(1, -20, 0, 320)
+		picker_frame.Size = UDim2.new(1, -20, 0, 240)
 		set_drag_lock(dropdown.Visible, "picker")
 	end)
 
