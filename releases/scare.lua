@@ -215,3 +215,24 @@ UserInputService.InputBegan:Connect(function(input, gpe)
 		end
 	end
 end)
+
+NiceGui.create_style("Void black", 
+	{
+		Color3.new(0,0,0),
+		Color3.new(0,0,0),
+		Color3.new(0,0,0),
+		Color3.new(0,0,0),
+		Color3.new(0,0,0),
+		Color3.new(0,0,0)
+	}
+)
+NiceGui.create_style("Pretty Pink", 
+	{
+		Color3.fromRGB(235, 143, 193),
+		Color3.fromRGB(255, 33, 154),
+		Color3.fromRGB(235, 110, 119),
+		Color3.fromRGB(255, 176, 182),
+		Color3.fromRGB(255, 0, 115),
+		Color3.fromRGB(230, 119, 169)
+	}
+)
