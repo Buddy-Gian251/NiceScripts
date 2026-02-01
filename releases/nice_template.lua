@@ -49,11 +49,30 @@ gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 gui.DisplayOrder = math.pow(2,16)
 gui.Parent = PARENT
 
+local gui_ready = false
+local pending_tabs = {}
+
 local currently_dragged = {}
+local styles = {}
 local drag_lock = {
 	locked = false,
 	reason = nil -- optional (slider, modal, etc.)
 }
+
+-- ===== STYLE SYSTEM =====
+
+styles = {
+	["VIBRANT BLUE"] = {
+		P1  = Color3.fromRGB(20, 110, 255), -- Primary1
+		P2  = Color3.fromRGB(11, 60, 139),  -- Primary2
+		S1  = Color3.fromRGB(5, 188, 255),  -- Secondary1
+		S2  = Color3.fromRGB(136, 16, 255), -- Secondary2
+		S3  = Color3.fromRGB(50, 50, 50),   -- Secondary3
+		TB1 = Color3.fromRGB(200, 200, 200) -- TextBox1
+	}
+}
+
+local DEFAULT_STYLE = "VIBRANT BLUE"
 
 local function playsound(id, volume)
 	local s = Instance.new("Sound")
@@ -150,13 +169,13 @@ end
 
 local function create_styles(item)
 	local UI_Corner = Instance.new("UICorner")
-	UI_Corner.CornerRadius = UDim.new(0, 10)
+	UI_Corner.CornerRadius = UDim.new(0, 6)
 	UI_Corner.Parent = item
 	local UI_Padding = Instance.new("UIPadding")
-	UI_Padding.PaddingLeft = UDim.new(0, 10)
-	UI_Padding.PaddingRight = UDim.new(0, 10)
-	UI_Padding.PaddingTop = UDim.new(0, 10)
-	UI_Padding.PaddingBottom = UDim.new(0, 10)
+	UI_Padding.PaddingLeft = UDim.new(0, 6)
+	UI_Padding.PaddingRight = UDim.new(0, 6)
+	UI_Padding.PaddingTop = UDim.new(0, 6)
+	UI_Padding.PaddingBottom = UDim.new(0, 6)
 	UI_Padding.Parent = item
 	local UI_Stroke = Instance.new("UIStroke")
 	UI_Stroke.Color = Color3.fromRGB(255,255,255)
@@ -206,18 +225,116 @@ local tabs = {}
 local active_tab_window = nil
 local DEFAULT_TAB_NAME = "Uncategorized"
 
-local themes = {
-	["Default"] = {
-		["PrimeColorLight"] = Color3.fromRGB(20, 110, 255),
-		["PrimeColorDark"] = Color3.fromRGB(0, 67, 126),
-		["AccentColor"] = Color3.fromRGB(0, 255, 255),
-		["TextColor"] = Color3.fromRGB(0, 0, 0),
-	},
-}
+local STYLE_FADE_TIME = 2
 
-function NiceUI.create_gui(name, gui_smoothness)
+local function tween_prop(obj, props)
+	local t = TweenService:Create(
+		obj,
+		TweenInfo.new(STYLE_FADE_TIME, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+		props
+	)
+	t:Play()
+end
+
+local function apply_text_contrast(ui)
+	if not (ui:IsA("TextLabel") or ui:IsA("TextButton") or ui:IsA("TextBox")) then
+		return
+	end
+
+	local bg = ui.BackgroundColor3
+	local transparency = ui.BackgroundTransparency or 0
+
+	-- brightness (0–255)
+	local brightness = (bg.R + bg.G + bg.B) / 3 * 255
+
+	-- remove old temp stroke
+	local old = ui:FindFirstChild("tempstroke")
+	if old then old:Destroy() end
+
+	if transparency < 0.5 then
+		if brightness <= 99 then
+			ui.TextColor3 = Color3.new(1,1,1)
+
+		elseif brightness <= 149 then
+			ui.TextColor3 = Color3.new(1,1,1)
+
+			local stroke = Instance.new("UIStroke")
+			stroke.Name = "tempstroke"
+			stroke.Color = Color3.new(0,0,0)
+			stroke.Thickness = 2
+			stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
+			stroke.Parent = ui
+
+			task.delay(0.4, function()
+				if stroke then stroke:Destroy() end
+			end)
+
+		else
+			ui.TextColor3 = Color3.new(0,0,0)
+		end
+	end
+end
+
+function NiceUI.apply_style(instance, style_name)
+	if not instance or not styles[style_name] then return end
+	local style = styles[style_name]
+
+	-- Background tween
+	if instance:IsA("Frame") or instance:IsA("TextButton") or instance:IsA("TextBox") then
+		tween_prop(instance, {
+			BackgroundColor3 = style.P1
+		})
+	end
+
+	-- TextBox override
+	if instance:IsA("TextBox") then
+		tween_prop(instance, {
+			BackgroundColor3 = style.TB1
+		})
+	end
+
+	-- Stroke
+	local stroke = instance:FindFirstChildOfClass("UIStroke")
+	if stroke then
+		tween_prop(stroke, {
+			Color = style.S2
+		})
+	end
+
+	-- Gradient
+	local grad = instance:FindFirstChildOfClass("UIGradient")
+	if grad then
+		grad.Color = ColorSequence.new{
+			ColorSequenceKeypoint.new(0, style.P1),
+			ColorSequenceKeypoint.new(1, style.P2)
+		}
+	end
+
+	apply_text_contrast(instance)
+
+	instance:SetAttribute("NiceUI_Style", style_name)
+end
+
+function NiceUI.create_style(name, data)
+	assert(type(name) == "string", "Style name must be a string")
+	assert(type(data) == "table", "Style data must be a table")
+
+	styles[name] = {
+		P1  = data.P1  or Color3.new(1,1,1),
+		P2  = data.P2  or Color3.new(1,1,1),
+		S1  = data.S1  or Color3.new(1,1,1),
+		S2  = data.S2  or Color3.new(1,1,1),
+		S3  = data.S3  or Color3.new(1,1,1),
+		TB1 = data.TB1 or Color3.new(1,1,1)
+	}
+end
+
+local function init_gui()
+	if gui_ready then return end
+
+	-- main frame
 	local frame = Instance.new("Frame")
-	frame.Name = name
+	frame.Name = "NiceUI_Main"
 	frame.Size = UDim2.new(0, 500, 0, 320)
 	frame.Position = UDim2.new(0.5, 0, 0.4, 0)
 	frame.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -225,29 +342,26 @@ function NiceUI.create_gui(name, gui_smoothness)
 	frame.BackgroundTransparency = 0.4
 	frame.Parent = gui
 
-	-- Title
+	-- title
 	local title = Instance.new("TextLabel")
 	title.Name = "Title"
 	title.Size = UDim2.new(1, 0, 0, 20)
-	title.Position = UDim2.new(0, 0, 0, 0)
-	title.Text = "niceGui: "..name
 	title.BackgroundTransparency = 1
-	title.TextColor3 = Color3.fromRGB(255, 255, 255)
-	title.TextSize = 20
+	title.Text = "niceGui"
+	title.TextScaled = true
+	title.TextColor3 = Color3.new(1,1,1)
 	title.Font = Enum.Font.GothamBold
 	title.Parent = frame
 
-	-- Tabs column
+	-- tabs column
 	local tabs_frame = Instance.new("ScrollingFrame")
 	tabs_frame.Name = "Tabs"
 	tabs_frame.Size = UDim2.new(0, 145, 1, -20)
 	tabs_frame.Position = UDim2.new(0, 0, 0, 20)
-	tabs_frame.BackgroundColor3 = Color3.fromRGB(20, 110, 255)
 	tabs_frame.BackgroundTransparency = 0.4
-	tabs_frame.ClipsDescendants = true
 	tabs_frame.Parent = frame
 
-	-- Content area for all tabs
+	-- content area
 	local content_frame = Instance.new("Frame")
 	content_frame.Name = "Content"
 	content_frame.Size = UDim2.new(1, -155, 1, -20)
@@ -255,54 +369,56 @@ function NiceUI.create_gui(name, gui_smoothness)
 	content_frame.BackgroundTransparency = 1
 	content_frame.Parent = frame
 
-	local toggle_button = Instance.new("TextButton")
-	toggle_button.Name = "Toggle"
-	toggle_button.Text = "niceGui"
-	toggle_button.Size = UDim2.new(0, 80, 0, 40)
-	toggle_button.Position = UDim2.new(0.5, 0, 0, 50)
-	toggle_button.AnchorPoint = Vector2.new(0.5,0.5)
-	toggle_button.BackgroundColor3 = Color3.fromRGB(20, 110, 255)
-	toggle_button.BackgroundTransparency = 0.4
-	toggle_button.TextColor3 = Color3.new(1,1,1)
-	toggle_button.Parent = gui
-
-	local tabs_layout = Instance.new("UIListLayout") 
-	tabs_layout.SortOrder = Enum.SortOrder.LayoutOrder 
-	tabs_layout.Padding = UDim.new(0,6) 
-	tabs_layout.Parent = tabs_frame 
-	tabs_layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() 
-		tabs_frame.CanvasSize = UDim2.new(0,0,0,tabs_layout.AbsoluteContentSize.Y + 10) 
+	-- layouts / styles
+	local tabs_layout = Instance.new("UIListLayout")
+	tabs_layout.Padding = UDim.new(0, 6)
+	tabs_layout.Parent = tabs_frame
+	tabs_layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+		tabs_frame.CanvasSize = UDim2.new(0,0,0,tabs_layout.AbsoluteContentSize.Y + 10)
 	end)
 
+	create_styles(frame)
 	create_styles(tabs_frame)
 	create_styles(content_frame)
 	make_draggable(frame)
-	create_styles(frame)
-	make_draggable(toggle_button)
-	create_styles(toggle_button)
 
-	toggle_button.Activated:Connect(function()
-		if next(currently_dragged) then return end
-		frame.Visible = not frame.Visible
-	end)
-
-	if gui_smoothness and typeof(gui_smoothness) == "number" then
-		smoothSpeed = gui_smoothness
-	end
-
+	-- expose internals
 	curr_mframe = frame
 	currtabframe = tabs_frame
-	currbuttonsframe = content_frame -- now default tab content lives here
+	currbuttonsframe = content_frame
 
-	return gui
+	gui_ready = true
+
+	-- flush queued tabs
+	for tabName in pairs(pending_tabs) do
+		NiceUI.create_tab(tabName)
+	end
+	table.clear(pending_tabs)
+end
+
+function NiceUI.create_gui(name, gui_smoothness)
+	NiceUI.display_message("Oh No! Deprecated?", "Sorry, this function is deprecated and will be removed completely. Please use NiceUI.set_name(name) instead!")
+end
+
+function NiceUI.set_name(name)
+	assert(type(name) == "string", "GUI name must be a string")
+
+	gui.Name = name
+
+	if curr_mframe then
+		local title = curr_mframe:FindFirstChild("Title")
+		if title then
+			title.Text = "niceGui: " .. name
+		end
+	end
 end
 
 function NiceUI.create_tab(tab_name)
-	assert(curr_mframe, "create_gui() must be called first")
 	tab_name = tab_name or DEFAULT_TAB_NAME
 
-	if tabs[tab_name] then
-		return tabs[tab_name]
+	if not gui_ready then
+		pending_tabs[tab_name] = true
+		return nil
 	end
 
 	local tab_button
@@ -330,6 +446,12 @@ function NiceUI.create_tab(tab_name)
 	tab_window.VerticalScrollBarInset = Enum.ScrollBarInset.Always
 	tab_window.HorizontalScrollBarInset = Enum.ScrollBarInset.Always
 	tab_window.Parent = currbuttonsframe
+	local padding = Instance.new("UIPadding")
+	padding.PaddingLeft = UDim.new(0,8)
+	padding.PaddingRight = UDim.new(0,8)
+	padding.PaddingTop = UDim.new(0,8)
+	padding.PaddingBottom = UDim.new(0,8)
+	padding.Parent = tab_window
 	local layout = Instance.new("UIListLayout")
 	layout.Padding = UDim.new(0,10)
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
@@ -369,15 +491,25 @@ function NiceUI.create_tab(tab_name)
 end
 
 local function get_tab_frame(tab)
-	if tab then
+	if not gui_ready then
+		return nil
+	end
+
+	tab = tab or DEFAULT_TAB_NAME
+	if tabs[tab] then
+		return tabs[tab]
+	else
 		return NiceUI.create_tab(tab)
 	end
-	-- default tab
-	return NiceUI.create_tab(DEFAULT_TAB_NAME)
 end
 
 function NiceUI.create_click_button(name, tab, callback)
 	local parent_frame = get_tab_frame(tab)
+	if not parent_frame then
+		warn("NiceUI: GUI not ready, cannot create item picker:", name)
+		return
+	end
+
 	local b = Instance.new("TextButton")
 	b.Name = name
 	b.Text = name
@@ -395,6 +527,35 @@ function NiceUI.create_click_button(name, tab, callback)
 	return b
 end
 
+local function clamp255(n)
+	return math.clamp(math.floor(n + 0.5), 0, 255)
+end
+
+local function color3_to_hex(c)
+	return string.format("%02X%02X%02X",
+		clamp255(c.R * 255),
+		clamp255(c.G * 255),
+		clamp255(c.B * 255)
+	)
+end
+
+local function hex_to_color3(hex)
+	hex = hex:gsub("#", "")
+	local r
+	local g
+	local b
+	pcall(function()
+		if #hex ~= 6 then return nil end
+
+		r = tonumber(hex:sub(1,2), 16)
+		g = tonumber(hex:sub(3,4), 16)
+		b = tonumber(hex:sub(5,6), 16)
+		if not r or not g or not b then return nil end
+	end)
+
+	return Color3.fromRGB(r, g, b)
+end
+
 function NiceUI.create_slider(name, init_number, float_enabled, range, tab, callback)
 	if not name then return end
 	if not range or type(range) ~= "table" or range[1] == nil or range[2] == nil then
@@ -403,6 +564,10 @@ function NiceUI.create_slider(name, init_number, float_enabled, range, tab, call
 	end
 
 	local parent_frame = get_tab_frame(tab)
+	if not parent_frame then
+		warn("NiceUI: GUI not ready, cannot create item picker:", name)
+		return
+	end
 
 	local min_val = range[1] :: number
 	local max_val = range[2] :: number
@@ -551,6 +716,10 @@ end
 function NiceUI.create_text_editor(name, text, tab, callback)
 	if not name then return end
 	local parent_frame = get_tab_frame(tab)
+	if not parent_frame then
+		warn("NiceUI: GUI not ready, cannot create item picker:", name)
+		return
+	end
 	local te_frame = Instance.new("Frame")
 	te_frame.Name = tostring(name)
 	te_frame.Size = UDim2.new(1, 0, 0, 70)
@@ -589,20 +758,19 @@ end
 
 function NiceUI.create_item_picker(name, items, default, tab, callback)
 	if not name or not items then return end
-
 	local parent_frame = get_tab_frame(tab)
+	if not parent_frame then
+		warn("NiceUI: GUI not ready, cannot create item picker:", name)
+		return
+	end
 	local list = normalize_list(items)
-
 	local selected = default or list[1]
-
-	-- Root frame
 	local picker_frame = Instance.new("Frame")
 	picker_frame.Name = tostring(name)
 	picker_frame.Size = UDim2.new(1, 0, 0, 80)
 	picker_frame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 	picker_frame.BorderSizePixel = 1
 	picker_frame.Parent = parent_frame
-
 	local title = Instance.new("TextLabel")
 	title.Name = "Title"
 	title.Size = UDim2.new(1, -10, 0, 10)
@@ -612,8 +780,6 @@ function NiceUI.create_item_picker(name, items, default, tab, callback)
 	title.TextScaled = true
 	title.TextColor3 = Color3.new(1,1,1)
 	title.Parent = picker_frame
-
-	-- Button
 	local button = Instance.new("TextButton")
 	button.Size = UDim2.new(1, -10, 0, 40)
 	button.Position = UDim2.new(0, 5, 0, 15)
@@ -623,8 +789,6 @@ function NiceUI.create_item_picker(name, items, default, tab, callback)
 	button.TextXAlignment = Enum.TextXAlignment.Left
 	button.Text = tostring(selected)
 	button.Parent = picker_frame
-
-	-- Dropdown
 	local dropdown = Instance.new("ScrollingFrame")
 	dropdown.Visible = false
 	dropdown.Size = UDim2.new(1, -10, 0, 140)
@@ -635,26 +799,20 @@ function NiceUI.create_item_picker(name, items, default, tab, callback)
 	dropdown.BorderSizePixel = 1
 	dropdown.ZIndex = picker_frame.ZIndex + 5
 	dropdown.Parent = picker_frame
-
 	local layout = Instance.new("UIListLayout")
 	layout.Padding = UDim.new(0, 4)
 	layout.Parent = dropdown
-
 	create_styles(picker_frame)
 	create_styles(button)
 	create_styles(dropdown)
-
 	layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
 		dropdown.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 6)
 	end)
-
 	local function close()
 		dropdown.Visible = false
 		picker_frame.Size = UDim2.new(1, -20, 0, 80)
 		set_drag_lock(false)
 	end
-
-	-- Populate items
 	for _, item in ipairs(list) do
 		local b = Instance.new("TextButton")
 		b.Size = UDim2.new(1, -8, 0, 30)
@@ -663,7 +821,6 @@ function NiceUI.create_item_picker(name, items, default, tab, callback)
 		b.TextScaled = true
 		b.Text = tostring(item)
 		b.Parent = dropdown
-
 		b.MouseButton1Click:Connect(function()
 			selected = item
 			button.Text = tostring(item)
@@ -673,13 +830,11 @@ function NiceUI.create_item_picker(name, items, default, tab, callback)
 			end
 		end)
 	end
-
 	button.MouseButton1Click:Connect(function()
 		dropdown.Visible = not dropdown.Visible
 		picker_frame.Size = UDim2.new(1, -20, 0, 240)
 		set_drag_lock(dropdown.Visible, "picker")
 	end)
-
 	return {
 		Frame = picker_frame,
 		Get = function() return selected end,
@@ -690,9 +845,146 @@ function NiceUI.create_item_picker(name, items, default, tab, callback)
 	}
 end
 
+function NiceUI.create_color_editor(name, value, tab, callback)
+	local parent_frame = get_tab_frame(tab)
+	if not parent_frame then
+		warn("NiceUI: GUI not ready, cannot create item picker:", name)
+		return
+	end
+	local currentColor = value or Color3.new(0,0,0)
+	local syncing = false
+	local col_edit = Instance.new("Frame")
+	col_edit.Name = "col_edit"
+	col_edit.Size = UDim2.new(1, 0, 0, 190)
+	col_edit.BackgroundColor3 = Color3.fromRGB(50,50,50)
+	col_edit.Parent = parent_frame
+	create_styles(col_edit)
+	local title = Instance.new("TextLabel")
+	title.Size = UDim2.new(1, 0, 0, 20)
+	title.BackgroundTransparency = 1
+	title.TextScaled = true
+	title.Text = name
+	title.TextColor3 = Color3.new(1,1,1)
+	title.Parent = col_edit
+	local container = Instance.new("Frame")
+	container.Size = UDim2.new(1, 0, 1, -20)
+	container.Position = UDim2.new(0, 0, 0, 20)
+	container.BackgroundTransparency = 1
+	container.Parent = col_edit
+	create_styles(container)
+	local grid = Instance.new("UIGridLayout")
+	grid.CellSize = UDim2.new(0.48, 0, 0, 30)
+	grid.CellPadding = UDim2.new(0.04, 0, 0, 8)
+	grid.FillDirection = Enum.FillDirection.Vertical
+	grid.Parent = container
+	local function make_field(labelText)
+		local f = Instance.new("Frame")
+		f.BackgroundTransparency = 1
+		local label = Instance.new("TextLabel")
+		label.Size = UDim2.new(0.4, 0, 1, 0)
+		label.BackgroundTransparency = 1
+		label.Text = labelText
+		label.TextScaled = true
+		label.TextColor3 = Color3.new(1,1,1)
+		label.Parent = f
+		local box = Instance.new("TextBox")
+		box.Size = UDim2.new(0.6, -4, 1, 0)
+		box.Position = UDim2.new(0.4, 4, 0, 0)
+		box.BackgroundColor3 = Color3.fromRGB(200,200,200)
+		box.TextColor3 = Color3.fromRGB(0,0,0)
+		box.TextScaled = true
+		box.ClearTextOnFocus = false
+		box.Parent = f
+		create_styles(box)
+		return f, box
+	end
+	local rF, rBox = make_field("Red")
+	local gF, gBox = make_field("Green")
+	local bF, bBox = make_field("Blue")
+	local hexF, hexBox = make_field("Hex")
+	local hF, hBox = make_field("Hue")
+	local sF, sBox = make_field("Sat")
+	local vF, vBox = make_field("Val")
+	rF.Parent = container
+	gF.Parent = container
+	bF.Parent = container
+	hexF.Parent = container
+	hF.Parent = container
+	sF.Parent = container
+	vF.Parent = container
+	local preview = Instance.new("Frame")
+	preview.Size = UDim2.new(1, -10, 0, 30)
+	preview.BackgroundColor3 = currentColor
+	preview.Parent = container
+	create_styles(preview)
+	local function sync_from_color()
+		if syncing then return end
+		syncing = true
+		local r,g,b = clamp255(currentColor.R*255), clamp255(currentColor.G*255), clamp255(currentColor.B*255)
+		local h,s,v = currentColor:ToHSV()
+		rBox.Text = r
+		gBox.Text = g
+		bBox.Text = b
+		hBox.Text = math.floor(h * 360 + 0.5)
+		sBox.Text = math.floor(s * 100 + 0.5)
+		vBox.Text = math.floor(v * 100 + 0.5)
+		hexBox.Text = color3_to_hex(currentColor)
+		preview.BackgroundColor3 = currentColor
+		if callback then
+			callback(currentColor)
+		end
+		syncing = false
+	end
+	local function set_rgb()
+		local r = tonumber(rBox.Text)
+		local g = tonumber(gBox.Text)
+		local b = tonumber(bBox.Text)
+		if r and g and b then
+			currentColor = Color3.fromRGB(clamp255(r), clamp255(g), clamp255(b))
+			sync_from_color()
+		end
+	end
+	local function set_hsv()
+		local h = tonumber(hBox.Text)
+		local s = tonumber(sBox.Text)
+		local v = tonumber(vBox.Text)
+		if h and s and v then
+			currentColor = Color3.fromHSV(
+				math.clamp(h / 360, 0, 1),
+				math.clamp(s / 100, 0, 1),
+				math.clamp(v / 100, 0, 1)
+			)
+			sync_from_color()
+		end
+	end
+	for _, box in ipairs({rBox,gBox,bBox}) do
+		box.FocusLost:Connect(set_rgb)
+	end
+	for _, box in ipairs({hBox,sBox,vBox}) do
+		box.FocusLost:Connect(set_hsv)
+	end
+	hexBox.FocusLost:Connect(function()
+		local c = hex_to_color3(hexBox.Text)
+		if c then
+			currentColor = c
+			sync_from_color()
+		end
+	end)
+	task.defer(sync_from_color)
+	return {
+		Frame = col_edit,
+		Get = function() return currentColor end,
+		Set = function(c)
+			if typeof(c) == "Color3" then
+				currentColor = c
+				sync_from_color()
+			end
+		end
+	}
+end
+
 function NiceUI.display_message(customtitle, customtext, customsound)
 	local nosound = (not customsound) or tostring(customsound) == ""
-
 	notify(
 		"NiceGui: "..tostring(customtitle),
 		"NiceGui: "..tostring(customtext),
@@ -701,5 +993,29 @@ function NiceUI.display_message(customtitle, customtext, customsound)
 		nosound
 	)
 end
+
+init_gui()
+
+NiceUI.create_tab("Styles")
+
+local style_names = {}
+for name in pairs(styles) do
+	table.insert(style_names, name)
+end
+
+NiceUI.create_item_picker(
+	"UI Style",
+	style_names,
+	DEFAULT_STYLE,
+	"Styles",
+	function(styleName)
+		for _, ui in ipairs(gui:GetDescendants()) do
+			if ui:GetAttribute("NiceUI_Style") ~= nil then
+				NiceUI.apply_style(ui, styleName)
+			end
+		end
+		notify("Style Changed", styleName .. " applied", 1.5)
+	end
+)
 
 return NiceUI
