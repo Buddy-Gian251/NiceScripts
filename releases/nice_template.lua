@@ -190,6 +190,11 @@ local function create_styles(item)
 	}
 	UI_Gradient.Rotation = 90
 	UI_Gradient.Parent = item
+		-- Apply default style attribute
+	item:SetAttribute("NiceUI_Style", DEFAULT_STYLE)
+
+	-- Immediately apply the style
+	NiceUI.apply_style(item, DEFAULT_STYLE)
 end
 
 local function normalize_list(list)
@@ -1010,7 +1015,8 @@ NiceUI.create_item_picker(
 	"Styles",
 	function(styleName)
 		for _, ui in ipairs(gui:GetDescendants()) do
-			if ui:GetAttribute("NiceUI_Style") ~= nil then
+			-- Only apply to frames, textboxes, buttons, etc.
+			if ui:IsA("Frame") or ui:IsA("TextButton") or ui:IsA("TextBox") then
 				NiceUI.apply_style(ui, styleName)
 			end
 		end
