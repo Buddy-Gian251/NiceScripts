@@ -810,7 +810,7 @@ function NiceUI.create_item_picker(name, items, default, tab, callback)
 	end)
 	local function close()
 		dropdown.Visible = false
-		picker_frame.Size = UDim2.new(1, -20, 0, 80)
+		picker_frame.Size = UDim2.new(1, 0, 0, 80)
 		set_drag_lock(false)
 	end
 	for _, item in ipairs(list) do
@@ -832,7 +832,7 @@ function NiceUI.create_item_picker(name, items, default, tab, callback)
 	end
 	button.MouseButton1Click:Connect(function()
 		dropdown.Visible = not dropdown.Visible
-		picker_frame.Size = UDim2.new(1, -20, 0, 240)
+		picker_frame.Size = UDim2.new(1, 0, 0, 240)
 		set_drag_lock(dropdown.Visible, "picker")
 	end)
 	return {
