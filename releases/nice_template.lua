@@ -51,17 +51,17 @@ gui.Parent = PARENT
 
 local gui_ready = false
 local pending_tabs = {}
-
+local theme_picker = nil
 local currently_dragged = {}
-local styles = {}
+local themes = {}
 local drag_lock = {
 	locked = false,
 	reason = nil -- optional (slider, modal, etc.)
 }
 
--- ===== STYLE SYSTEM =====
+-- ===== THEME SYSTEM =====
 
-styles = {
+themes = {
 	["VIBRANT BLUE"] = {
 		P1  = Color3.fromRGB(20, 110, 255), -- Primary1
 		P2  = Color3.fromRGB(11, 60, 139),  -- Primary2
@@ -72,7 +72,7 @@ styles = {
 	}
 }
 
-local DEFAULT_STYLE = "VIBRANT BLUE"
+local DEFAULT_THEME = "VIBRANT BLUE"
 
 local function playsound(id, volume)
 	local s = Instance.new("Sound")
@@ -167,15 +167,17 @@ local function set_drag_lock(state, reason)
 	drag_lock.reason = state and (reason or "unknown") or nil
 end
 
+local univpadding = 8
+
 local function create_styles(item)
 	local UI_Corner = Instance.new("UICorner")
-	UI_Corner.CornerRadius = UDim.new(0, 6)
+	UI_Corner.CornerRadius = UDim.new(0, univpadding)
 	UI_Corner.Parent = item
 	local UI_Padding = Instance.new("UIPadding")
-	UI_Padding.PaddingLeft = UDim.new(0, 6)
-	UI_Padding.PaddingRight = UDim.new(0, 6)
-	UI_Padding.PaddingTop = UDim.new(0, 6)
-	UI_Padding.PaddingBottom = UDim.new(0, 6)
+	UI_Padding.PaddingLeft = UDim.new(0, univpadding)
+	UI_Padding.PaddingRight = UDim.new(0, univpadding)
+	UI_Padding.PaddingTop = UDim.new(0, univpadding)
+	UI_Padding.PaddingBottom = UDim.new(0, univpadding)
 	UI_Padding.Parent = item
 	local UI_Stroke = Instance.new("UIStroke")
 	UI_Stroke.Color = Color3.fromRGB(255,255,255)
@@ -190,34 +192,22 @@ local function create_styles(item)
 	}
 	UI_Gradient.Rotation = 90
 	UI_Gradient.Parent = item
-		-- Apply default style attribute
-	item:SetAttribute("NiceUI_Style", DEFAULT_STYLE)
-
-	-- Immediately apply the style
-	NiceUI.apply_style(item, DEFAULT_STYLE)
 end
 
 local function normalize_list(list)
 	local out = {}
-
-	-- EnumItems
 	if typeof(list) == "Enum" then
 		for _, item in ipairs(list:GetEnumItems()) do
 			table.insert(out, item)
 		end
 		return out
 	end
-
-	-- EnumItem array
 	if typeof(list[1]) == "EnumItem" then
 		return list
 	end
-
-	-- Normal table
 	for _, v in pairs(list) do
 		table.insert(out, v)
 	end
-
 	return out
 end
 
@@ -230,12 +220,12 @@ local tabs = {}
 local active_tab_window = nil
 local DEFAULT_TAB_NAME = "Uncategorized"
 
-local STYLE_FADE_TIME = 2
+local THEME_FADE_TIME = 2
 
 local function tween_prop(obj, props)
 	local t = TweenService:Create(
 		obj,
-		TweenInfo.new(STYLE_FADE_TIME, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+		TweenInfo.new(THEME_FADE_TIME, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
 		props
 	)
 	t:Play()
@@ -245,24 +235,16 @@ local function apply_text_contrast(ui)
 	if not (ui:IsA("TextLabel") or ui:IsA("TextButton") or ui:IsA("TextBox")) then
 		return
 	end
-
 	local bg = ui.BackgroundColor3
 	local transparency = ui.BackgroundTransparency or 0
-
-	-- brightness (0–255)
 	local brightness = (bg.R + bg.G + bg.B) / 3 * 255
-
-	-- remove old temp stroke
 	local old = ui:FindFirstChild("tempstroke")
 	if old then old:Destroy() end
-
 	if transparency < 0.5 then
 		if brightness <= 99 then
 			ui.TextColor3 = Color3.new(1,1,1)
-
 		elseif brightness <= 149 then
 			ui.TextColor3 = Color3.new(1,1,1)
-
 			local stroke = Instance.new("UIStroke")
 			stroke.Name = "tempstroke"
 			stroke.Color = Color3.new(0,0,0)
@@ -273,65 +255,71 @@ local function apply_text_contrast(ui)
 			task.delay(0.4, function()
 				if stroke then stroke:Destroy() end
 			end)
-
 		else
 			ui.TextColor3 = Color3.new(0,0,0)
 		end
 	end
 end
 
-function NiceUI.apply_style(instance, style_name)
-	if not instance or not styles[style_name] then return end
-	local style = styles[style_name]
-
-	-- Background tween
-	if instance:IsA("Frame") or instance:IsA("TextButton") or instance:IsA("TextBox") then
-		tween_prop(instance, {
-			BackgroundColor3 = style.P1
-		})
+local function update_theme_picker()
+	if not theme_picker then return end
+	local items = {}
+	for name in pairs(themes) do
+		table.insert(items, name)
 	end
-
-	-- TextBox override
-	if instance:IsA("TextBox") then
-		tween_prop(instance, {
-			BackgroundColor3 = style.TB1
-		})
-	end
-
-	-- Stroke
-	local stroke = instance:FindFirstChildOfClass("UIStroke")
-	if stroke then
-		tween_prop(stroke, {
-			Color = style.S2
-		})
-	end
-
-	-- Gradient
-	local grad = instance:FindFirstChildOfClass("UIGradient")
-	if grad then
-		grad.Color = ColorSequence.new{
-			ColorSequenceKeypoint.new(0, style.P1),
-			ColorSequenceKeypoint.new(1, style.P2)
-		}
-	end
-
-	apply_text_contrast(instance)
-
-	instance:SetAttribute("NiceUI_Style", style_name)
+	theme_picker:Set(items)
 end
 
-function NiceUI.create_style(name, data)
-	assert(type(name) == "string", "Style name must be a string")
-	assert(type(data) == "table", "Style data must be a table")
+function NiceUI.apply_theme(instance, theme_name)
+	notify("Themes are out of order for a moment...", "Please wait 'til the developer fixes this.", 0, nil)
+	--if not instance or not themes[theme_name] then return end
+	--local theme = themes[theme_name]
+	--if instance:IsA("Frame") or instance:IsA("TextButton") or instance:IsA("TextBox") then
+	--	tween_prop(instance, {
+	--		BackgroundColor3 = theme.P1
+	--	})
+	--end
+	--if instance:IsA("TextBox") then
+	--	tween_prop(instance, {
+	--		BackgroundColor3 = theme.TB1
+	--	})
+	--end
+	--local stroke = instance:FindFirstChildOfClass("UIStroke")
+	--if stroke then
+	--	tween_prop(stroke, {
+	--		Color = theme.S2
+	--	})
+	--end
+	--local grad = instance:FindFirstChildOfClass("UIGradient")
+	--if grad then
+	--	grad.Color = ColorSequence.new{
+	--		ColorSequenceKeypoint.new(0, theme.P1),
+	--		ColorSequenceKeypoint.new(1, theme.P2)
+	--	}
+	--end
+	--apply_text_contrast(instance)
+	--instance:SetAttribute("NiceUI_Theme", theme_name)
+end
 
-	styles[name] = {
-		P1  = data.P1  or Color3.new(1,1,1),
-		P2  = data.P2  or Color3.new(1,1,1),
-		S1  = data.S1  or Color3.new(1,1,1),
-		S2  = data.S2  or Color3.new(1,1,1),
-		S3  = data.S3  or Color3.new(1,1,1),
-		TB1 = data.TB1 or Color3.new(1,1,1)
-	}
+function NiceUI.create_theme(name, data)
+	notify("Themes are out of order for a moment...", "Please wait 'til the developer fixes this.", 0, nil)
+	--assert(type(name) == "string", "Theme name must be a string")
+	--assert(type(data) == "table", "Theme data must be a table")
+	--themes[name] = {
+	--	P1  = data.P1  or Color3.new(1,1,1),
+	--	P2  = data.P2  or Color3.new(1,1,1),
+	--	S1  = data.S1  or Color3.new(1,1,1),
+	--	S2  = data.S2  or Color3.new(1,1,1),
+	--	S3  = data.S3  or Color3.new(1,1,1),
+	--	TB1 = data.TB1 or Color3.new(1,1,1)
+	--}
+	--if theme_picker then
+	--	theme_picker:SetItems((function()
+	--		local t = {}
+	--		for k in pairs(themes) do table.insert(t,k) end
+	--		return t
+	--	end)())
+	--end
 end
 
 local function init_gui()
@@ -340,12 +328,25 @@ local function init_gui()
 	-- main frame
 	local frame = Instance.new("Frame")
 	frame.Name = "NiceUI_Main"
-	frame.Size = UDim2.new(0, 500, 0, 320)
+	frame.Size = UDim2.new(0, 600, 0, 320)
 	frame.Position = UDim2.new(0.5, 0, 0.4, 0)
 	frame.AnchorPoint = Vector2.new(0.5, 0.5)
 	frame.BackgroundColor3 = Color3.fromRGB(20, 110, 255)
 	frame.BackgroundTransparency = 0.4
 	frame.Parent = gui
+
+	local toggle = Instance.new("TextButton")
+	toggle.Name = "Toggle"
+	toggle.Size = UDim2.new(0, 32, 0, 32)
+	toggle.Position = UDim2.new(0.5, 0, 0, 0)
+	toggle.AnchorPoint = Vector2.new(0.5, 0)
+	toggle.BackgroundColor3 = Color3.fromRGB(20, 110, 255)
+	toggle.BackgroundTransparency = 0.4
+	toggle.Text = "NiceUI"
+	toggle.TextScaled = true
+	toggle.TextColor3 = Color3.new(1,1,1)
+	toggle.Font = Enum.Font.GothamBold
+	toggle.Parent = gui
 
 	-- title
 	local title = Instance.new("TextLabel")
@@ -382,9 +383,16 @@ local function init_gui()
 		tabs_frame.CanvasSize = UDim2.new(0,0,0,tabs_layout.AbsoluteContentSize.Y + 10)
 	end)
 
+	toggle.Activated:Connect(function()
+		if next(currently_dragged) then return end
+		frame.Visible = not frame.Visible
+	end)
+
 	create_styles(frame)
+	create_styles(toggle)
 	create_styles(tabs_frame)
 	create_styles(content_frame)
+	make_draggable(toggle)
 	make_draggable(frame)
 
 	-- expose internals
@@ -764,88 +772,105 @@ end
 function NiceUI.create_item_picker(name, items, default, tab, callback)
 	if not name or not items then return end
 	local parent_frame = get_tab_frame(tab)
-	if not parent_frame then
-		warn("NiceUI: GUI not ready, cannot create item picker:", name)
-		return
-	end
+	if not parent_frame then return end
+
 	local list = normalize_list(items)
 	local selected = default or list[1]
+
 	local picker_frame = Instance.new("Frame")
-	picker_frame.Name = tostring(name)
-	picker_frame.Size = UDim2.new(1, 0, 0, 80)
-	picker_frame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-	picker_frame.BorderSizePixel = 1
+	picker_frame.Name = name
+	picker_frame.Size = UDim2.new(1,0,0,80)
+	picker_frame.BackgroundColor3 = Color3.fromRGB(50,50,50)
 	picker_frame.Parent = parent_frame
+
 	local title = Instance.new("TextLabel")
 	title.Name = "Title"
-	title.Size = UDim2.new(1, -10, 0, 10)
-	title.Position = UDim2.new(0, 5, 0, 0)
+	title.Size = UDim2.new(1,-10,0,10)
+	title.Position = UDim2.new(0,5,0,0)
 	title.BackgroundTransparency = 1
 	title.Text = name
 	title.TextScaled = true
 	title.TextColor3 = Color3.new(1,1,1)
 	title.Parent = picker_frame
+
 	local button = Instance.new("TextButton")
-	button.Size = UDim2.new(1, -10, 0, 40)
-	button.Position = UDim2.new(0, 5, 0, 15)
-	button.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+	button.Size = UDim2.new(1,-10,0,40)
+	button.Position = UDim2.new(0,5,0,15)
+	button.BackgroundColor3 = Color3.fromRGB(80,80,80)
 	button.TextColor3 = Color3.new(1,1,1)
 	button.TextScaled = true
 	button.TextXAlignment = Enum.TextXAlignment.Left
 	button.Text = tostring(selected)
 	button.Parent = picker_frame
+
 	local dropdown = Instance.new("ScrollingFrame")
 	dropdown.Visible = false
-	dropdown.Size = UDim2.new(1, -10, 0, 140)
-	dropdown.Position = UDim2.new(0, 5, 0, 70)
-	dropdown.CanvasSize = UDim2.new()
-	dropdown.ScrollBarThickness = 6
-	dropdown.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+	dropdown.Size = UDim2.new(1,-10,0,140)
+	dropdown.Position = UDim2.new(0,5,0,70)
+	dropdown.BackgroundColor3 = Color3.fromRGB(40,40,40)
 	dropdown.BorderSizePixel = 1
 	dropdown.ZIndex = picker_frame.ZIndex + 5
 	dropdown.Parent = picker_frame
+
 	local layout = Instance.new("UIListLayout")
-	layout.Padding = UDim.new(0, 4)
+	layout.Padding = UDim.new(0,4)
 	layout.Parent = dropdown
+	layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+		dropdown.CanvasSize = UDim2.new(0,0,0,layout.AbsoluteContentSize.Y + 6)
+	end)
+
 	create_styles(picker_frame)
 	create_styles(button)
 	create_styles(dropdown)
-	layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-		dropdown.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 6)
-	end)
-	local function close()
+
+	local function close_dropdown()
 		dropdown.Visible = false
-		picker_frame.Size = UDim2.new(1, 0, 0, 80)
-		set_drag_lock(false)
+		picker_frame.Size = UDim2.new(1,0,0,80)
 	end
-	for _, item in ipairs(list) do
-		local b = Instance.new("TextButton")
-		b.Size = UDim2.new(1, -8, 0, 30)
-		b.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
-		b.TextColor3 = Color3.new(1,1,1)
-		b.TextScaled = true
-		b.Text = tostring(item)
-		b.Parent = dropdown
-		b.MouseButton1Click:Connect(function()
-			selected = item
-			button.Text = tostring(item)
-			close()
-			if callback then
-				callback(item)
-			end
-		end)
+
+	local function rebuild_dropdown()
+		-- destroy old buttons
+		for _, child in ipairs(dropdown:GetChildren()) do
+			if child:IsA("TextButton") then child:Destroy() end
+		end
+		-- create new ones
+		for _, item in ipairs(list) do
+			local b = Instance.new("TextButton")
+			b.Size = UDim2.new(1,-8,0,30)
+			b.BackgroundColor3 = Color3.fromRGB(70,70,70)
+			b.TextColor3 = Color3.new(1,1,1)
+			b.TextScaled = true
+			b.Text = tostring(item)
+			b.Parent = dropdown
+			b.MouseButton1Click:Connect(function()
+				selected = item
+				button.Text = tostring(item)
+				close_dropdown()
+				if callback then callback(item) end
+			end)
+		end
 	end
+
 	button.MouseButton1Click:Connect(function()
 		dropdown.Visible = not dropdown.Visible
-		picker_frame.Size = UDim2.new(1, 0, 0, 240)
-		set_drag_lock(dropdown.Visible, "picker")
+		picker_frame.Size = UDim2.new(1,0,0, dropdown.Visible and 240 or 80)
+		if dropdown.Visible then rebuild_dropdown() end
 	end)
+
 	return {
 		Frame = picker_frame,
 		Get = function() return selected end,
 		Set = function(v)
-			selected = v
-			button.Text = tostring(v)
+			if table.find(list,v) then
+				selected = v
+				button.Text = tostring(v)
+			end
+		end,
+		SetItems = function(newList)
+			list = normalize_list(newList)
+			selected = list[1] or nil
+			button.Text = tostring(selected)
+			rebuild_dropdown()
 		end
 	}
 end
@@ -1001,27 +1026,29 @@ end
 
 init_gui()
 
-NiceUI.create_tab("Styles")
+-- HEY!
+-- Themes is undergoing color errors at this moment, come back if you need to!
+-- [February 3, 2026]
 
-local style_names = {}
-for name in pairs(styles) do
-	table.insert(style_names, name)
-end
+---- === THEMES TAB ===
+--NiceUI.create_tab("Themes")
 
-NiceUI.create_item_picker(
-	"UI Style",
-	style_names,
-	DEFAULT_STYLE,
-	"Styles",
-	function(styleName)
-		for _, ui in ipairs(gui:GetDescendants()) do
-			-- Only apply to frames, textboxes, buttons, etc.
-			if ui:IsA("Frame") or ui:IsA("TextButton") or ui:IsA("TextBox") then
-				NiceUI.apply_style(ui, styleName)
-			end
-		end
-		notify("Style Changed", styleName .. " applied", 1.5)
-	end
-)
+---- collect theme names as strings
+--local theme_names = {}
+--for name in pairs(themes) do
+--	table.insert(theme_names, name)
+--end
+
+--theme_picker = NiceUI.create_item_picker(
+--	"Select Theme",
+--	theme_names,
+--	DEFAULT_THEME,
+--	"Themes",
+--	function(selected)
+--		NiceUI.apply_theme(curr_mframe, selected)
+--	end
+--)
+
+--theme_picker.Set(DEFAULT_THEME)
 
 return NiceUI
