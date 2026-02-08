@@ -24,7 +24,7 @@ local CONFIG = {
 	ShowHealth = true,
 	ShowDistance = false,
 
-	MaxDistance = 500,
+	MaxDistance = 16384,
 	LineOrigin = Vector2.new(0.5, 1),
 }
 
