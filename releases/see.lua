@@ -226,3 +226,9 @@ end)
 open_source.create_click_button("Toggle Distance", "ESP", function()
 	CONFIG.ShowDistance = not CONFIG.ShowDistance
 end)
+
+open_source.create_slider("MAX DISTANCE", 500, false, {256, 16384}, "Configuration", function(newval)
+	if newval then
+		CONFIG.MaxDistance = newval
+	end
+end)
