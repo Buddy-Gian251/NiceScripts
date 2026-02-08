@@ -337,7 +337,7 @@ local function init_gui()
 
 	local toggle = Instance.new("TextButton")
 	toggle.Name = "Toggle"
-	toggle.Size = UDim2.new(0, 32, 0, 32)
+	toggle.Size = UDim2.new(0, 64, 0, 32)
 	toggle.Position = UDim2.new(0.5, 0, 0, 0)
 	toggle.AnchorPoint = Vector2.new(0.5, 0)
 	toggle.BackgroundColor3 = Color3.fromRGB(20, 110, 255)
@@ -411,6 +411,10 @@ end
 
 function NiceUI.create_gui(name, gui_smoothness)
 	NiceUI.display_message("Oh No! Deprecated?", "Sorry, this function is deprecated and will be removed completely. Please use NiceUI.set_name(name) instead!")
+end
+
+function NiceUI.get_gui()
+	return gui
 end
 
 function NiceUI.set_name(name)
