@@ -124,6 +124,14 @@ local function createESP(player, hrp)
 
 		if text ~= "" then
 			label.Text = text
+		
+			-- Team color (fallback to white)
+			if player.Team then
+				label.TextColor3 = player.TeamColor.Color
+			else
+				label.TextColor3 = Color3.new(1, 1, 1)
+			end
+		
 			label.Position = UDim2.fromOffset(rootPos.X, rootPos.Y - 20)
 			label.Visible = true
 		else
