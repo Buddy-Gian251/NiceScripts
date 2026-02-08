@@ -10,12 +10,12 @@ local StarterGui = game:GetService("StarterGui")
 local LocalPlayer = Players.LocalPlayer
 
 local sound_files = {
-	startup = "rbxassetid://9085027122",
-	err = "rbxassetid://8426701399",
+	startup = "rbxassetid://987728667",
+	err = "rbxassetid://6838454574",
 	succ = "rbxassetid://7762841318",
-	notif = "rbxassetid://8183296024",
+	notif = "rbxassetid://489103549",
 	close = "rbxassetid://573639200",
-	kicked = "rbxassetid://8499261098"
+	kicked = "rbxassetid://5204290066"
 }
 
 local function rand_string()
@@ -58,6 +58,11 @@ local drag_lock = {
 	locked = false,
 	reason = nil -- optional (slider, modal, etc.)
 }
+
+if not _G.nice_gui_opensource then
+	_G.nice_gui_opensource = {}
+end
+_G.nice_gui_opensource.version = 150
 
 -- ===== THEME SYSTEM =====
 
@@ -211,7 +216,7 @@ local function normalize_list(list)
 	return out
 end
 
-playsound(sound_files.startup, 1)
+playsound(sound_files.startup, 5)
 
 local curr_mframe
 local currtabframe
@@ -353,7 +358,7 @@ local function init_gui()
 	title.Name = "Title"
 	title.Size = UDim2.new(1, 0, 0, 20)
 	title.BackgroundTransparency = 1
-	title.Text = "niceGui"
+	title.Text = "niceGui [v".._G.nice_gui_opensource.version.."]"
 	title.TextScaled = true
 	title.TextColor3 = Color3.new(1,1,1)
 	title.Font = Enum.Font.GothamBold
@@ -385,6 +390,9 @@ local function init_gui()
 
 	toggle.Activated:Connect(function()
 		if next(currently_dragged) then return end
+		if frame.Visible then
+			playsound(sound_files.close, 3)
+		end
 		frame.Visible = not frame.Visible
 	end)
 
@@ -425,7 +433,7 @@ function NiceUI.set_name(name)
 	if curr_mframe then
 		local title = curr_mframe:FindFirstChild("Title")
 		if title then
-			title.Text = "niceGui: " .. name
+			title.Text = "niceGui [v".._G.nice_gui_opensource.version.."]: " .. name
 		end
 	end
 end
@@ -1054,5 +1062,9 @@ init_gui()
 --)
 
 --theme_picker.Set(DEFAULT_THEME)
+
+LocalPlayer.Destroying:Connect(function()
+	playsound(sound_files.kicked, 10)
+end)
 
 return NiceUI
