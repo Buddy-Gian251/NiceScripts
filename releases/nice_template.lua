@@ -9,12 +9,12 @@ local StarterGui = game:GetService("StarterGui")
 
 local LocalPlayer = Players.LocalPlayer
 local sound_files = {
-	startup = "rbxassetid://987728667",
+	startup = "rbxassetid://587166970",
 	err = "rbxassetid://5204290066",
 	wrn = "rbxassetid://6838454574",
 	notif = "rbxassetid://7229097896",
 	close = "rbxassetid://99276942443345",
-	open = "rbxassetid://587166970",
+	open = "rbxassetid://987728667",
 	kicked = "rbxassetid://5204290066",
 	p_off = "rbxassetid://6858975342"
 }
