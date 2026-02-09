@@ -211,3 +211,6 @@ end)
 open_source.create_boolean("Toggle Distance", true, "ESP", function(a)
 	CONFIG.ShowDistance = a
 end)
+open_source.create_slider("Max Distance", 500, false, {256, 16384}, "Configuration", function(a)
+	CONFIG.MaxDistance = a
+end)
