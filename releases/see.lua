@@ -120,10 +120,17 @@ local function createESP(player, hrp)
 		local text = ""
 		if CONFIG.ShowNames then text = player.Name end
 		if CONFIG.ShowHealth then text ..= " [" .. math.floor(hum.Health) .. "]" end
-		if CONFIG.ShowDistance then text ..= " (" .. math.floor(dist) .. "m)" end
+		if CONFIG.ShowDistance then text ..= " [" .. math.floor(dist) .. "m]" end
 
 		if text ~= "" then
 			label.Text = text
+
+			if player.Team then
+				label.TextColor3 = player.TeamColor.Color
+			else
+				label.TextColor3 = Color3.new(1, 1, 1)
+			end
+		
 			label.Position = UDim2.fromOffset(rootPos.X, rootPos.Y - 20)
 			label.Visible = true
 		else
