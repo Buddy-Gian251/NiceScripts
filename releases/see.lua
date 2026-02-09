@@ -24,7 +24,7 @@ local CONFIG = {
 	ShowHealth = true,
 	ShowDistance = false,
 
-	MaxDistance = 16384,
+	MaxDistance = 500,
 	LineOrigin = Vector2.new(0.5, 1),
 }
 
@@ -124,14 +124,6 @@ local function createESP(player, hrp)
 
 		if text ~= "" then
 			label.Text = text
-		
-			-- Team color (fallback to white)
-			if player.Team then
-				label.TextColor3 = player.TeamColor.Color
-			else
-				label.TextColor3 = Color3.new(1, 1, 1)
-			end
-		
 			label.Position = UDim2.fromOffset(rootPos.X, rootPos.Y - 20)
 			label.Visible = true
 		else
@@ -199,36 +191,23 @@ end
 for _, p in ipairs(Players:GetPlayers()) do
 	hookPlayer(p)
 end
-
 Players.PlayerAdded:Connect(hookPlayer)
 Players.PlayerRemoving:Connect(removeESP)
-
-open_source.create_click_button("Toggle SEE", "ESP", function()
-	CONFIG.Enabled = not CONFIG.Enabled
+open_source.create_boolean("Toggle SEE", false, "ESP", function(a)
+	CONFIG.Enabled = a
 end)
-
-open_source.create_click_button("Toggle Frames", "ESP", function()
-	CONFIG.ShowFrames = not CONFIG.ShowFrames
+open_source.create_boolean("Toggle Frames", true, "ESP", function(a)
+	CONFIG.ShowFrames = a
 end)
-
-open_source.create_click_button("Toggle Lines", "ESP", function()
-	CONFIG.ShowLines = not CONFIG.ShowLines
+open_source.create_boolean("Toggle Lines", true, "ESP", function(a)
+	CONFIG.ShowLines = a
 end)
-
-open_source.create_click_button("Toggle Names", "ESP", function()
-	CONFIG.ShowNames = not CONFIG.ShowNames
+open_source.create_boolean("Toggle Names", true, "ESP", function(a)
+	CONFIG.ShowNames = a
 end)
-
-open_source.create_click_button("Toggle Health", "ESP", function()
-	CONFIG.ShowHealth = not CONFIG.ShowHealth
+open_source.create_boolean("Toggle Health", true, "ESP", function(a)
+	CONFIG.ShowHealth = a
 end)
-
-open_source.create_click_button("Toggle Distance", "ESP", function()
-	CONFIG.ShowDistance = not CONFIG.ShowDistance
-end)
-
-open_source.create_slider("MAX DISTANCE", 500, false, {256, 16384}, "Configuration", function(newval)
-	if newval then
-		CONFIG.MaxDistance = newval
-	end
+open_source.create_boolean("Toggle Distance", true, "ESP", function(a)
+	CONFIG.ShowDistance = a
 end)
