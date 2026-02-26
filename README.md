@@ -1,5 +1,5 @@
 # NiceScripts
-## Where ideas turn into reality
+### Where ideas turn into reality
 ### By nicehouse10000e and some00004 (Roblox users)
 
 # Introduction
