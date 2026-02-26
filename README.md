@@ -28,7 +28,7 @@ We have these available scripts that can be used publicly without any issues
 1. NiceTemplate v151
 
 # About: NiceUI
-## UI VERSION: 152-Beta 02222026A
+### UI VERSION: 152-Beta 02222026A
 Here is a list of NiceUI's public functions
 ## Usable
 1. `get_gui()` gives you a separate GUI container that NiceUI can manage. No arguments
