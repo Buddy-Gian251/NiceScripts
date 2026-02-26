@@ -108,4 +108,4 @@ Below is a list of public functions currently available.
   Arguments: `string, {Color3, Color3, Color3, Color3, Color3, Color3}`
 
 ### Additional notes:
-NiceUI's name set as "stereotypica" means it's a beta or unreleased version of NiceUI
+NiceUI's name set as "stereotypica", which means it's a beta or unstable release version of NiceUI
