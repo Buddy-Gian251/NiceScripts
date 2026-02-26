@@ -28,26 +28,84 @@ We have these available scripts that can be used publicly without any issues
 1. NiceTemplate v151
 
 # About: NiceUI
-### UI VERSION: 152-Beta 02222026A
-Here is a list of NiceUI's public functions
-## Usable
-1. `get_gui()` gives you a separate GUI container that NiceUI can manage. No arguments
-2. `set_name(name)` sets the name of the interface. 1 argument: a string value
-3. `create_tab(name)` creates a tab with a name. 1 argument: a string value
-4. `create_click_button(name, tab, callback)` creates a button in a tab with a name. 3 arguments: string, string, function
-5. `create_slider(name, init_number, float_enabled, range, tab, callback)` creates a slider in a tab. 6 arguments: string, number, boolean, {number, number}, string, function
-6. `create_text_editor(name, text, tab, callback)` creates a text editor in a tab. 4 arguments: string, string, string, function
-7. `create_item_picker(name, items, default, tab, callback)` creates an item picker for a table. 5 arguments: string, table, table.item, string, function
-8. `create_color_editor(name, value, tab, callback)` creates a color editor. 4 arguments: string, color3, string, function
-9. `create_boolean(name, default, tab, callback)` creates a true/false toggle. 4 arguments: string, boolean, string, function
-10. `create_text(name, value, tab)` creates a text. 3 arguments: string, string, string
-11. `make_stealth_mode()` hides/unhides the GUI, useful when recording a gameplay (since the separate GUI hides also).
-12. `create_popup(name, description, choices, callback)` creates a pop-up for confirmation or an alternate way of sending notifications. 4 arguments: string, string, table, function
-13. `display_message(customtitle, customtext, customsound)` casts a message, traditional use for notifications.
+### UI Version: 152-Beta 02222026A
+
+NiceUI is the primary interface framework of the NiceScripts project.  
+It is designed to be lightweight, modular, and easy to integrate into different Roblox environments.  
+The goal of NiceUI is to provide a structured and expandable UI system that developers can build on without rewriting core components.
+
+Below is a list of public functions currently available.
+
+## Public Functions
+
+### Core
+1. `get_gui()`  
+   Returns a dedicated GUI container managed by NiceUI.  
+   Arguments: none
+
+2. `set_name(name)`  
+   Sets the main interface title.  
+   Arguments: `string`
+
+3. `create_tab(name)`  
+   Creates a new tab inside the interface.  
+   Arguments: `string`
+
+### Interactive Components
+4. `create_click_button(name, tab, callback)`  
+   Creates a clickable button inside a specified tab.  
+   Arguments: `string, string, function`
+
+5. `create_slider(name, default_value, allow_float, range, tab, callback)`  
+   Creates a slider with configurable range and optional floating-point values.  
+   Arguments: `string, number, boolean, {number, number}, string, function`
+
+6. `create_text_editor(name, default_text, tab, callback)`  
+   Creates a text editor field for user input.  
+   Arguments: `string, string, string, function`
+
+7. `create_item_picker(name, items, default_item, tab, callback)`  
+   Creates a selectable item list from a provided table.  
+   Arguments: `string, table, table.item, string, function`
+
+8. `create_color_editor(name, default_color, tab, callback)`  
+   Creates a Color3 editor for selecting UI or feature colors.  
+   Arguments: `string, Color3, string, function`
+
+9. `create_boolean(name, default_value, tab, callback)`  
+   Creates a toggle (true/false switch).  
+   Arguments: `string, boolean, string, function`
+
+### Display & Utility
+10. `create_text(name, value, tab)`  
+    Displays static text inside a tab.  
+    Arguments: `string, string, string`
+
+11. `create_popup(title, description, choices, callback)`  
+    Creates a confirmation or decision popup window.  
+    Arguments: `string, string, table, function`
+
+12. `display_message(title, message, sound_id)`  
+    Displays a notification message with optional sound.  
+    Arguments: `string, string, string`
+
+13. `make_stealth_mode()`  
+    Toggles visibility of the GUI. Useful during gameplay recording or screenshots.  
+    Arguments: none
 
 ## Deprecated
-1. `create_gui(name, smoothness)` creates the GUI, please migrate to `set_name(name)` to avoid errors (WILL BE DELETED ON v154).
+- `create_gui(name, smoothness)`  
+  This function will be removed in v154.  
+  Please migrate to `set_name(name)` to avoid future compatibility issues.
 
 ## Temporarily Disabled
-1. `apply_theme(instance, theme_name)` applies to the target theme. 2 arguments: object, name
-2. `create_theme(name, data)` creates a theme. 2 arguments: string, {color3, color3, color3, color3, color3, color3)
+- `apply_theme(instance, theme_name)`  
+  Applies a specified theme to a target instance.  
+  Arguments: `object, string`
+
+- `create_theme(name, data)`  
+  Creates a new custom theme configuration.  
+  Arguments: `string, {Color3, Color3, Color3, Color3, Color3, Color3}`
+
+### Additional notes:
+	NiceUI's name set as "stereotypica" means it's a beta or unreleased version of NiceUI
