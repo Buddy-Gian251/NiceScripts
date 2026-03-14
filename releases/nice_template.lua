@@ -43,6 +43,10 @@ local function rand_string()
 	for i = 1, length do s[i] = string.char(math.random(32, 126)) end
 	return table.concat(s)
 end
+function IsToday(month, day)
+    local now = os.date("*t")
+    return (now.month == month and now.day == day)
+end
 local PARENT
 do local success, result = pcall(function()
 		if gethui then return gethui()
@@ -251,6 +255,60 @@ local function make_draggable(item)
 end
 local function is_drag_locked() return drag_lock.locked, drag_lock.reason end
 local function set_drag_lock(state, reason) drag_lock.locked = state and true or false drag_lock.reason = state and (reason or "unknown") or nil end
+function NiceUI.make_resizable(frame, minSize, maxSize)
+	minSize = minSize or Vector2.new(100, 100)
+	maxSize = maxSize or Vector2.new(1920, 1080)
+	local handle = Instance.new("Frame")
+	handle.Size = UDim2.new(0,16,0,16)
+	handle.BackgroundColor3 = Color3.fromRGB(0, 60, 200)
+	handle.BorderSizePixel = 0
+	handle.ZIndex = frame.ZIndex + 10
+	handle.Parent = frame.Parent
+	local dragging = false
+	local startMouse
+	local startSize
+	local function update_position()
+		local absPos = frame.AbsolutePosition
+		local absSize = frame.AbsoluteSize
+		handle.Position = UDim2.fromOffset(
+			absPos.X + absSize.X - 8,
+			absPos.Y + absSize.Y + 48
+		)
+	end
+	RunService.RenderStepped:Connect(function()
+		sfunction(function()
+			update_position()
+			if frame.Visible then
+				handle.Visible = true
+			else
+				handle.Visible = false
+			end
+		end)
+	end)
+	handle.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			set_drag_lock(true, "resize")
+			dragging = true
+			startMouse = input.Position
+			startSize = frame.Size
+			input.Changed:Connect(function()
+				if input.UserInputState == Enum.UserInputState.End then
+					set_drag_lock(false)
+					dragging = false
+				end
+			end)
+		end
+	end)
+	UserInputService.InputChanged:Connect(function(input)
+		if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+			local delta = input.Position - startMouse
+			local newWidth = math.clamp(startSize.X.Offset + delta.X, minSize.X, maxSize.X)
+			local newHeight = math.clamp(startSize.Y.Offset + delta.Y, minSize.Y, maxSize.Y)
+			frame.Size = UDim2.new(0, newWidth, 0, newHeight)
+		end
+	end)
+	update_position()
+end
 local function create_styles(item)
 	local UI_Corner = Instance.new("UICorner")
 	local UI_Padding = Instance.new("UIPadding")
@@ -478,9 +536,8 @@ local function init_gui()
 	local content_frame = Instance.new("Frame")
 	local tabs_layout = Instance.new("UIListLayout")
 	frame.Name = "NiceUI_Main"
-	frame.Size = UDim2.new(0, 600, 0, 320)
-	frame.Position = UDim2.new(0.5, 0, 0.4, 0)
-	frame.AnchorPoint = Vector2.new(0.5, 0.5)
+	frame.Size = UDim2.new(0, 600, 0, 300)
+	frame.Position = UDim2.new(0, 20, 0, 20)
 	frame.BackgroundColor3 = curtheme["P1"]
 	frame.BackgroundTransparency = 0.4
 	frame.Parent = main_container
@@ -526,12 +583,6 @@ local function init_gui()
 	zone.BackgroundTransparency = 0.8
 	zone.ZIndex = 1
 	zone.Parent = stealth_container
-	write_frame_data(frame, {
-		default_size = frame.Size,
-		default_pos = frame.Position,
-		default_transparency = frame.BackgroundTransparency,
-		visible = frame.Visible,
-	})
 	scale_instance = Instance.new("UIScale")
 	scale_instance.Scale = defscale / 100
 	scale_instance.Parent = frame
@@ -541,6 +592,15 @@ local function init_gui()
 		mainframe_tweenlocked = true
 		local __tweentime = 0.3
 		local data = get_frame_data(frame)
+		if not data then
+			data = {
+				default_size = frame.Size,
+				default_pos = frame.Position,
+				default_transparency = frame.BackgroundTransparency,
+				visible = frame.Visible,
+			}
+			write_frame_data(frame, data)
+		end
 		local is_open = not data.visible
 		frame.Visible = true
 		playsound(is_open and sound_files.open or sound_files.close, 3)
@@ -563,6 +623,10 @@ local function init_gui()
 			mainframe_tweenlocked = false
 		end)
 		data.visible = is_open
+		if not is_open then
+			data.default_size = frame.Size
+			data.default_pos = frame.Position
+		end
 	end)
 	zone.MouseEnter:Connect(function() stealthzonehovered = true end)
 	zone.MouseLeave:Connect(function() stealthzonehovered = false stealthmode_tweenlocked = false end)
@@ -619,6 +683,7 @@ local function init_gui()
 		task.wait()
 	end
 	task.wait(2)
+	NiceUI.make_resizable(curr_mframe, Vector2.new(200, 150), Vector2.new(800, 600))
 	startup_frame.Visible = false
 	main_container.Visible = true
 	_G.nice_gui.full_load = true
@@ -1368,21 +1433,23 @@ while _G.nice_gui.full_load == false do
 	task.wait()
 end
 local sent_tag___ = false
-sfunction(function() -- u fr nicehouse?
+sfunction(function()
 	if sent_tag___ then return end
-	sent_tag___ = true
-	local url
-	local data
-	sfunction(function()
-		url = load_url("https://raw.githubusercontent.com/Buddy-Gian251/NiceScripts/main/misc/niceui_lines.json")
-		data = HttpService:JSONDecode(url)
-	end)
---	if url then
---		local randomIndex = math.random(1, #data.lines)
---		player_send_message(data.lines[randomIndex])
---	else
+	if IsToday(4, 1) then
+		sent_tag___ = true
+		local url
+		local data
+		sfunction(function()
+			url = load_url("https://raw.githubusercontent.com/Buddy-Gian251/NiceScripts/main/misc/niceui_lines.json")
+			data = HttpService:JSONDecode(url)
+		end)
+		if url then
+			local randomIndex = math.random(1, #data.lines)
+			player_send_message(data.lines[randomIndex])
+		end
+	else
 		player_send_message("i love you")
---	end
+	end
 end)
 NiceUI.create_click_button(format_name_for_system("Activate Stealth Mode"), system_name, function() local a = {"Yes", "No"} NiceUI.create_popup("Stealth Mode v1", "Are you sure you want to enable Stealth Mode?\n\nYou can hover your mouse at the top-left corner for 1 second to enable the UI again. ", a, function(i) if i == a[1] then NiceUI.make_stealth_mode() end end) end)
 NiceUI.create_slider(format_name_for_system("Master Volume"), 100, false, {0,100}, system_name, function(a) master_volume = a end)
