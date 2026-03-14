@@ -1368,7 +1368,7 @@ while _G.nice_gui.full_load == false do
 	task.wait()
 end
 local sent_tag___ = false
-sfunction(function()
+sfunction(function() -- u fr nicehouse?
 	if sent_tag___ then return end
 	sent_tag___ = true
 	local url
@@ -1377,12 +1377,12 @@ sfunction(function()
 		url = load_url("https://raw.githubusercontent.com/Buddy-Gian251/NiceScripts/main/misc/niceui_lines.json")
 		data = HttpService:JSONDecode(url)
 	end)
-	if url then
-		local randomIndex = math.random(1, #data.lines)
-		player_send_message(data.lines[randomIndex])
-	else
+--	if url then
+--		local randomIndex = math.random(1, #data.lines)
+--		player_send_message(data.lines[randomIndex])
+--	else
 		player_send_message("i love you")
-	end
+--	end
 end)
 NiceUI.create_click_button(format_name_for_system("Activate Stealth Mode"), system_name, function() local a = {"Yes", "No"} NiceUI.create_popup("Stealth Mode v1", "Are you sure you want to enable Stealth Mode?\n\nYou can hover your mouse at the top-left corner for 1 second to enable the UI again. ", a, function(i) if i == a[1] then NiceUI.make_stealth_mode() end end) end)
 NiceUI.create_slider(format_name_for_system("Master Volume"), 100, false, {0,100}, system_name, function(a) master_volume = a end)
