@@ -126,7 +126,7 @@ local tabs = {}
 local theme_changables = {}
 local active_tab_window = nil
 local DEFAULT_TAB_NAME = "No Category"
-local THEME_FADE_TIME = 1
+local THEME_FADE_TIME = 2
 local master_volume = 100
 local stealthtimer
 local stealthconn
@@ -571,6 +571,7 @@ end
 local function init_gui()
 	if gui_ready then return end
 	local curtheme = get_theme()
+	local tab_size = 150
 	print(curtheme)
 	main_container = Instance.new("Frame")
 	main_container.Name = "MainContainer"
@@ -647,13 +648,13 @@ local function init_gui()
 	title.Font = Enum.Font.GothamBold
 	title.Parent = frame
 	tabs_frame.Name = "Tabs"
-	tabs_frame.Size = UDim2.new(0, 145, 1, -20)
+	tabs_frame.Size = UDim2.new(0, tab_size, 1, -20)
 	tabs_frame.Position = UDim2.new(0, 0, 0, 20)
 	tabs_frame.BackgroundTransparency = 0.5
 	tabs_frame.Parent = frame
 	content_frame.Name = "Content"
-	content_frame.Size = UDim2.new(1, -155, 1, -20)
-	content_frame.Position = UDim2.new(0, 155, 0, 20)
+	content_frame.Size = UDim2.new(1, -(tab_size+10), 1, -20)
+	content_frame.Position = UDim2.new(0, (tab_size+10), 0, 20)
 	content_frame.BackgroundTransparency = 0.5
 	content_frame.Parent = frame
 	tabs_layout.Padding = UDim.new(0, 6)
@@ -771,7 +772,7 @@ local function init_gui()
 	task.wait(2)
 	gui_ready = true
 	for tabName in pairs(pending_tabs) do NiceUI.create_tab(tabName) end
-	NiceUI.make_resizable(curr_mframe, Vector2.new(200, 150), Vector2.new(800, 600))
+	NiceUI.make_resizable(curr_mframe, Vector2.new(300, 150), Vector2.new(1000, 760))
 	startup_frame.Visible = false
 	main_container.Visible = true
 	notif_container.Visible = true
@@ -812,6 +813,7 @@ function NiceUI.create_tab(tab_name)
 		tab_button.TextScaled = true
 		tab_button.Font = Enum.Font.SourceSans
 		tab_button.Parent = currtabframe
+		tab_button.BorderSizePixel = 0
 	end
 	local tab_window = Instance.new("ScrollingFrame")
 	local padding = Instance.new("UIPadding")
@@ -842,18 +844,29 @@ function NiceUI.create_tab(tab_name)
 			layout.AbsoluteContentSize.Y + 10
 		)
 	end)
-	create_styles(tab_button)
 	local layout = Instance.new("UIListLayout")
 	layout.Padding = UDim.new(0,6)
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
 	layout.Parent = tab_window
 	if tab_button then
 		sfunction(function()
+			if tab_name == [[!@#$%^&*()_+{}:|<>?1234567890-=[];'\,./'sil]] then
+				tab_button.Size = UDim2.new(1, 0, 0, 1)
+				task.spawn(function()
+					tab_button.Visible = false
+					task.wait(7.75)
+					tab_button.Visible = true
+					task.wait(0.25)
+				end)
+			else
+				tab_button.Size = UDim2.new(1, 0, 0, 40)
+				create_styles(tab_button)
+			end
 			tab_button.Activated:Connect(function()
 				if active_tab_window then 
 					active_tab_window.Size = UDim2.new(1, 0, 1, 0)
 					active_tab_window.Visible = true
-					univ_tween(active_tab_window, {1, Enum.EasingStyle.Circular, Enum.EasingDirection.In}, {Size = UDim2.new(0, 0, 1, 0) } )
+					univ_tween(active_tab_window, {1, Enum.EasingStyle.Circular, Enum.EasingDirection.In}, {Size = UDim2.new(0, 0, 1, 0) })
 					active_tab_window.Visible = false 
 				end
 				active_tab_window = tab_window
@@ -891,8 +904,8 @@ function NiceUI.create_click_button(name, tab, callback)
 	b.Name = name
 	b.Text = name
 	b.TextScaled = true
-	b.Size = UDim2.new(1, 0, 0, 40)
 	b.BackgroundTransparency = 0.4
+	b.Size = UDim2.new(1, 0, 0, 40)
 	b.TextColor3 = Color3.new(1,1,1)
 	b.Parent = parent_frame
 	b.MouseButton1Click:Connect(function()
@@ -1563,9 +1576,52 @@ theme_picker = NiceUI.create_item_picker(
 -- ====================
 -- DEBUG: YOU MUST TURN THIS OFF IN PUBLIC RELEASES
 -- ====================
-if RunService:IsStudio() then
+local c = NiceUI.create_click_button(".", [[!@#$%^&*()_+{}:|<>?1234567890-=[];'\,./'sil]], function()
 	sfunction(function()
-		player_send_message("NiceUI is best! [Studio Test]")
+		local languages = {
+			{ name="German", code="de" },
+			{ name="English", code="en" },
+			{ name="Russian", code="ru" },
+			{ name="Swedish", code="sv" },
+			{ name="Finnish", code="fi" },
+			{ name="Greek", code="el" },
+			{ name="Arabic", code="ar" },
+			{ name="Simplified Chinese", code="zh-CN" },
+			{ name="Traditional Chinese", code="zh-TW" },
+			{ name="Thai", code="th" },
+			{ name="Hebrew", code="he" },
+			{ name="Portuguese (Brazil)", code="pt-BR" },
+			{ name="Portuguese (Portugal)", code="pt-PT" },
+			{ name="Spanish", code="es" },
+			{ name="French", code="fr" },
+			{ name="Czech", code="cs" },
+			{ name="Bulgarian", code="bg" },
+			{ name="Ukrainian", code="uk" },
+			{ name="Danish", code="da" },
+			{ name="Indonesian", code="id" },
+			{ name="Malay", code="ms" },
+			{ name="Azerbaijani", code="az" },
+			{ name="Japanese", code="ja" },
+			{ name="Korean", code="ko" }
+		}
+		local function translate_everything()
+			local lang = languages[math.random(1,#languages)]
+			local code = lang.code
+			notify("Translator", "Translating UI to "..lang.name.." ...", 3)
+			for _,obj in ipairs(gui:GetDescendants()) do
+				if obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox") then
+					local original = obj.Text
+					if original and original ~= "" then
+						task.spawn(function()
+							local translated = translate(original, code)
+							if translated then
+								obj.Text = translated
+							end
+						end)
+					end
+				end
+			end
+		end
 		local __translatortxt = "hello"
 		local __translatorlangtarget = "en"
 		local debugname = system_name..":debug"
@@ -1589,8 +1645,15 @@ if RunService:IsStudio() then
 				end
 			end)
 		end)
+		NiceUI.create_click_button(
+			format_name_for_system("Translate EVERYTHING"),
+			debugname,
+			function()
+				translate_everything()
+			end
+		)
 	end)
-end
+end)
 return NiceUI
 -- EDITOR NOTE:
 --[[
