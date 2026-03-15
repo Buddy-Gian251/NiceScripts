@@ -126,7 +126,7 @@ local tabs = {}
 local theme_changables = {}
 local active_tab_window = nil
 local DEFAULT_TAB_NAME = "No Category"
-local THEME_FADE_TIME = 2
+local THEME_FADE_TIME = 1
 local master_volume = 100
 local stealthtimer
 local stealthconn
