@@ -108,6 +108,9 @@ local data2 = {}
 local mainframe_tweenlocked = false
 local current_theme
 local system_name = "NiceUI" -- APRIL FOOLS : Yeongsung UI
+if IsToday(4, 1) or RunService:IsStudio() then
+	system_name = "Yeongsung UI"
+end
 local frame_data = {}
 local smoothSpeed = 0.3 
 local main_container 
@@ -132,6 +135,18 @@ local stealthtimer
 local stealthconn
 local defscale = 100
 local scale_instance
+local function get_property(object, property, propertytype)
+	if not object or not property then return end
+	local success, result = pcall(function()
+		return object[property]
+	end)
+	if success then
+		if propertytype and typeof(result) ~= propertytype then
+			return nil
+		end
+		return result
+	end
+end
 local function player_send_message(text)
 	if not text or type(text) ~= "string" then return end
 	if game.TextChatService.TextChannels.RBXGeneral then
@@ -141,14 +156,24 @@ local function player_send_message(text)
 	end
 end
 local function format_name_for_system(name) local formatname = system_name.." Core: " return formatname..tostring(name) end -- [[NAIO means Native Application Input/Output]]
+local function univ_tween(object, tweendata, propertydata, callback) if type(tweendata) ~= "table" or #tweendata <= 0 or not tweendata then tweendata = {1,Enum.EasingStyle.Linear,Enum.EasingDirection.InOut} end if not propertydata then warn(format_name_for_system("Error casted: ").."Property data is invalid or empty.") return end local tween = TweenService:Create(object, TweenInfo.new(table.unpack(tweendata)), propertydata) tween:Play() tween.Completed:Connect(function() if callback then callback() end task.wait() tween:Destroy() end) end
 local function get_mastervolume() return master_volume / 100 end
 local function playsound(id, volume)
 	if stealthmode or silent_mode then return end
 	local s = Instance.new("Sound")
 	s.SoundId = id
-	s.Volume = (volume or 1) * get_mastervolume()
 	s.Parent = gui
 	s:Play()
+	task.spawn(function()
+		while s and s.PlaybackSpeed and s.Playing do
+			if IsToday(4, 1) or RunService:IsStudio() then
+				task.wait()
+				local addspeed = math.random(-5, 5)
+				s.PlaybackSpeed += addspeed / 100
+			end
+			s.Volume = (volume or 1) * get_mastervolume()
+		end
+	end)
 	s.Ended:Connect(function() s:Destroy() end)
 end
 local sfunction = function(func, ...)
@@ -212,7 +237,6 @@ local function translate(text, target)
 	return nil
 end
 local function tween_prop(obj, props) local t = TweenService:Create( obj, TweenInfo.new(THEME_FADE_TIME, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), props )t:Play() end
-local function univ_tween(object, tweendata, propertydata, callback) if type(tweendata) ~= "table" or #tweendata <= 0 or not tweendata then tweendata = {1,Enum.EasingStyle.Linear,Enum.EasingDirection.InOut} end if not propertydata then warn(format_name_for_system("Error casted: ").."Property data is invalid or empty.") return end local tween = TweenService:Create(object, TweenInfo.new(table.unpack(tweendata)), propertydata) tween:Play() tween.Completed:Connect(function() if callback then callback() end task.wait() tween:Destroy() end) end
 local frame_data = {}
 local function write_frame_data(frame, data)
 	if not frame or not data then return end
@@ -220,18 +244,6 @@ local function write_frame_data(frame, data)
 end
 local function get_frame_data(frame)
 	return frame_data[frame]
-end
-local function get_property(object, property, propertytype)
-	if not object or not property then return end
-	local success, result = pcall(function()
-		return object[property]
-	end)
-	if success then
-		if propertytype and typeof(result) ~= propertytype then
-			return nil
-		end
-		return result
-	end
 end
 local function clamp255(n)
 	return math.clamp(math.floor(n + 0.5), 0, 255)
@@ -674,6 +686,7 @@ local function init_gui()
 	toggle.Activated:Connect(function()
 		if next(currently_dragged) then return end
 		if mainframe_tweenlocked then return end
+		local apr = IsToday(4, 1)
 		mainframe_tweenlocked = true
 		local __tweentime = 0.3
 		local data = get_frame_data(frame)
@@ -700,7 +713,8 @@ local function init_gui()
 		univ_tween(frame, {__tweentime, Enum.EasingStyle.Circular, Enum.EasingDirection.Out}, {
 			Size = is_open and data.default_size or UDim2.new(0,0,0,0),
 			Position = is_open and data.default_pos or toggle.Position,
-			BackgroundTransparency = is_open and data.default_transparency or 1
+			BackgroundTransparency = is_open and data.default_transparency or 1,
+			Rotation = is_open and 0 or 180
 		}, function()
 			if not is_open then
 				frame.Visible = false
@@ -1535,7 +1549,7 @@ end
 local sent_tag___ = false
 sfunction(function()
 	if sent_tag___ then return end
-	if IsToday(4, 1) then
+	if IsToday(4, 1) or RunService:IsStudio() then
 		sent_tag___ = true
 		local url
 		local data
@@ -1543,6 +1557,15 @@ sfunction(function()
 			url = load_url("https://raw.githubusercontent.com/Buddy-Gian251/NiceScripts/main/misc/niceui_lines.json")
 			data = HttpService:JSONDecode(url)
 		end)
+		NiceUI.create_theme("April", {
+			P1 = Color3.new(0, 0, 0),
+			P2 = Color3.new(1, 1, 1),
+			S1 = Color3.new(0, 0, 0),
+			S2 = Color3.new(1, 1, 1),
+			S3 = Color3.new(0, 0, 0),
+			TB1 = Color3.new(1, 1, 1),
+			Name = "bro"
+		})
 		if url then
 			local randomIndex = math.random(1, #data.lines)
 			player_send_message(data.lines[randomIndex])
