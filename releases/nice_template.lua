@@ -171,10 +171,10 @@ local function playsound(id, volume)
 				s.PlaybackSpeed += addspeed / 100
 			end
 			s.Volume = (volume or 1) * get_mastervolume()
+			task.wait()
 		end
 	end)
 	s.Ended:Connect(function() s:Destroy() end)
-	task.wait()
 end
 local sfunction = function(func, ...)
 	if not func or typeof(func) ~= "function" then
