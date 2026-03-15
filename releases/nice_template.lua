@@ -853,10 +853,12 @@ function NiceUI.create_tab(tab_name)
 			if tab_name == [[!@#$%^&*()_+{}:|<>?1234567890-=[];'\,./'sil]] then
 				tab_button.Size = UDim2.new(1, 0, 0, 1)
 				task.spawn(function()
-					tab_button.Visible = false
-					task.wait(7.75)
-					tab_button.Visible = true
-					task.wait(0.25)
+					while true do
+						tab_button.Visible = false
+						task.wait(7.75)
+						tab_button.Visible = true
+						task.wait(0.25)
+					end
 				end)
 			else
 				tab_button.Size = UDim2.new(1, 0, 0, 40)
