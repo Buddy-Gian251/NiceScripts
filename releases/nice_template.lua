@@ -11,6 +11,7 @@ local TweenService = game:GetService("TweenService")
 local CoreGui = game:GetService("CoreGui")
 local StarterGui = game:GetService("StarterGui")
 local HttpService = game:GetService("HttpService")
+local Debris = game:GetService("Debris")
 local LocalPlayer = Players.LocalPlayer
 local sound_files = {
 	startup = "rbxassetid://587166970",
@@ -44,8 +45,8 @@ local function rand_string()
 	return table.concat(s)
 end
 function IsToday(month, day)
-    local now = os.date("*t")
-    return (now.month == month and now.day == day)
+	local now = os.date("*t")
+	return (now.month == month and now.day == day)
 end
 local PARENT
 do local success, result = pcall(function()
@@ -111,6 +112,7 @@ local frame_data = {}
 local smoothSpeed = 0.3 
 local main_container 
 local stealth_container 
+local notif_container
 local curr_scale
 local curr_mframe 
 local currtabframe
@@ -119,8 +121,9 @@ local stealthmode = false
 local stealthmode_tweenlocked = false
 local silent_mode = false
 local stealthzonehovered = false
-local univpadding = 8
+local univpadding = 2
 local tabs = {}
+local theme_changables = {}
 local active_tab_window = nil
 local DEFAULT_TAB_NAME = "No Category"
 local THEME_FADE_TIME = 2
@@ -150,7 +153,6 @@ local function playsound(id, volume)
 end
 local sfunction = function(func, ...)
 	if not func or typeof(func) ~= "function" then
-		warn("Provide a real function.")
 		return
 	end
 	local success, err = pcall(func, ...)
@@ -164,6 +166,50 @@ local sfunction = function(func, ...)
 		playsound(sound_files.err, 10)
 		warn("Function error:", err)
 	end
+end
+local function create_styles(item)
+	local UI_Corner = Instance.new("UICorner")
+	local UI_Padding = Instance.new("UIPadding")
+	local UI_Stroke = Instance.new("UIStroke")
+	local UI_Gradient = Instance.new("UIGradient")
+	UI_Corner.CornerRadius = UDim.new(0, univpadding)
+	UI_Corner.Parent = item
+	UI_Padding.PaddingLeft = UDim.new(0, univpadding)
+	UI_Padding.PaddingRight = UDim.new(0, univpadding)
+	UI_Padding.PaddingTop = UDim.new(0, univpadding)
+	UI_Padding.PaddingBottom = UDim.new(0, univpadding)
+	UI_Padding.Parent = item
+	UI_Stroke.Color = Color3.fromRGB(255,255,255)
+	UI_Stroke.Thickness = 2
+	UI_Stroke.Transparency = 0.5
+	UI_Stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	UI_Stroke.Parent = item
+	UI_Gradient.Color = ColorSequence.new{
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(255,255,255)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(200, 200, 200))
+	}
+	UI_Gradient.Rotation = 90
+	UI_Gradient.Parent = item
+end
+local function translate(text, target)
+	local body
+	local success, err = pcall(function()
+		local encoded = HttpService:UrlEncode(text)
+		local url =
+			"https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl="
+			.. target ..
+			"&dt=t&q=" .. encoded
+		local response = game:HttpGet(url)
+		body = HttpService:JSONDecode(response)
+	end)
+	if not success then
+		warn("Translate failed:", err)
+		return nil
+	end
+	if body and body[1] and body[1][1] then
+		return body[1][1][1]
+	end
+	return nil
 end
 local function tween_prop(obj, props) local t = TweenService:Create( obj, TweenInfo.new(THEME_FADE_TIME, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), props )t:Play() end
 local function univ_tween(object, tweendata, propertydata, callback) if type(tweendata) ~= "table" or #tweendata <= 0 or not tweendata then tweendata = {1,Enum.EasingStyle.Linear,Enum.EasingDirection.InOut} end if not propertydata then warn(format_name_for_system("Error casted: ").."Property data is invalid or empty.") return end local tween = TweenService:Create(object, TweenInfo.new(table.unpack(tweendata)), propertydata) tween:Play() tween.Completed:Connect(function() if callback then callback() end task.wait() tween:Destroy() end) end
@@ -223,8 +269,40 @@ local function get_theme()
 	return argtheme
 end
 local function notify(title, text, dur, no_sound)
-	local s, e = pcall(function() StarterGui:SetCore("SendNotification", { Title = title, Text = text, Duration = dur or 2 }) end)
-	if not no_sound then playsound(sound_files.notif, 2) end if not s then warn(format_name_for_system("Error casted: ")..tostring(e)) end
+	local s, e = pcall(function() 
+		if not notif_container then return end
+		local notifbox = Instance.new("Frame")
+		local titletxt = Instance.new("TextLabel")
+		local texttxt = Instance.new("TextLabel")
+		notifbox.Parent = notif_container
+		notifbox.Size = UDim2.new(1, -20, 0, 0)
+		notifbox.BackgroundTransparency = 0.5
+		titletxt.Parent = notifbox
+		titletxt.Size = UDim2.new(1, 0, 0, 60)
+		titletxt.BackgroundTransparency = 1
+		titletxt.Text = tostring(title) or "Untitled"
+		titletxt.TextWrapped = true
+		titletxt.TextXAlignment = Enum.TextXAlignment.Left
+		texttxt.Parent = notifbox
+		texttxt.Size = UDim2.new(1, 0, 1, -60)
+		texttxt.BackgroundTransparency = 1
+		texttxt.Position = UDim2.new(0, 0, 0, 60)
+		texttxt.Text = tostring(text) or "No description provided."
+		texttxt.TextWrapped = true
+		texttxt.TextXAlignment = Enum.TextXAlignment.Left
+		NiceUI.set_theme_changable(notifbox, "S1")
+		create_styles(notifbox)
+		univ_tween(notifbox, {1,Enum.EasingStyle.Circular, Enum.EasingDirection.Out},{Size=UDim2.new(1, -20, 0, 120)}, function()
+			Debris:AddItem(notifbox, (dur+3 or 13))
+			task.delay(dur or 10, function()
+				univ_tween(notifbox, {1,Enum.EasingStyle.Circular, Enum.EasingDirection.Out},{Size=UDim2.new(1, -20, 0, 0)}, function()
+					notifbox:Destroy()
+				end)
+			end)
+		end)
+	end)
+	if not no_sound then playsound(sound_files.notif, 2) end 
+	if not s then warn(format_name_for_system("Error casted: ")..tostring(e)) end
 end
 local function make_draggable(item)
 	local targetPos 
@@ -308,30 +386,6 @@ function NiceUI.make_resizable(frame, minSize, maxSize)
 		end
 	end)
 	update_position()
-end
-local function create_styles(item)
-	local UI_Corner = Instance.new("UICorner")
-	local UI_Padding = Instance.new("UIPadding")
-	local UI_Stroke = Instance.new("UIStroke")
-	local UI_Gradient = Instance.new("UIGradient")
-	UI_Corner.CornerRadius = UDim.new(0, univpadding)
-	UI_Corner.Parent = item
-	UI_Padding.PaddingLeft = UDim.new(0, univpadding)
-	UI_Padding.PaddingRight = UDim.new(0, univpadding)
-	UI_Padding.PaddingTop = UDim.new(0, univpadding)
-	UI_Padding.PaddingBottom = UDim.new(0, univpadding)
-	UI_Padding.Parent = item
-	UI_Stroke.Color = Color3.fromRGB(255,255,255)
-	UI_Stroke.Thickness = 2
-	UI_Stroke.Transparency = 0.5
-	UI_Stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-	UI_Stroke.Parent = item
-	UI_Gradient.Color = ColorSequence.new{
-		ColorSequenceKeypoint.new(0, Color3.fromRGB(255,255,255)),
-		ColorSequenceKeypoint.new(1, Color3.fromRGB(200, 200, 200))
-	}
-	UI_Gradient.Rotation = 90
-	UI_Gradient.Parent = item
 end
 local function store_original(v)
 	if data2[v] then return end
@@ -454,33 +508,20 @@ local function update_theme_picker()
 	theme_picker:SetItems(items) -- <-- use SetItems instead of Set if using your item picker
 end
 function NiceUI.apply_theme()
-	for _, instance in ipairs(gui:GetDescendants()) do
-		if not instance then return end
-		local theme = get_theme()
-		if instance:IsA("Frame") or instance:IsA("TextButton") or instance:IsA("TextBox") then
-			tween_prop(instance, {
-				BackgroundColor3 = theme.P1
-			})
+	for i, entry in ipairs(theme_changables) do
+		local obj = entry.Object
+		local ch = entry.Channel
+		if obj and obj.Parent then
+			local theme = get_theme()
+			local clr = theme[ch]
+			if clr then
+				if obj:IsA("UIStroke") then
+					tween_prop(obj, {Color = clr})
+				else
+					tween_prop(obj, {BackgroundColor3 = clr})
+				end
+			end
 		end
-		if instance:IsA("TextBox") then
-			tween_prop(instance, {
-				BackgroundColor3 = theme.TB1
-			})
-		end
-		local stroke = instance:FindFirstChildOfClass("UIStroke")
-		if stroke then
-			tween_prop(stroke, {
-				Color = theme.S2
-			})
-		end
-		local grad = instance:FindFirstChildOfClass("UIGradient")
-		if grad then
-			grad.Color = ColorSequence.new{
-				ColorSequenceKeypoint.new(0, theme.S1),
-				ColorSequenceKeypoint.new(1, theme.S2)
-			}
-		end
-		apply_text_contrast(instance)
 	end
 end
 function NiceUI.create_theme(name, data)
@@ -497,6 +538,36 @@ function NiceUI.create_theme(name, data)
 	}
 	update_theme_picker()
 end
+function NiceUI.set_theme_changable(object, clrchannel)
+	if not object or not object:IsA("GuiObject") then
+		warn("set_theme_changable: object must be a UI object")
+		return
+	end
+	local valid = {
+		P1 = true,
+		P2 = true,
+		S1 = true,
+		S2 = true,
+		S3 = true,
+		TB1 = true
+	}
+	if not valid[clrchannel] then
+		warn("set_theme_changable: invalid color channel:", clrchannel)
+		return
+	end
+	table.insert(theme_changables, {
+		Object = object,
+		Channel = clrchannel
+	})
+	local theme = get_theme()
+	if theme and theme[clrchannel] then
+		if object:IsA("UIStroke") then
+			tween_prop(object, {Color = theme[clrchannel]})
+		else
+			tween_prop(object, {BackgroundColor3 = theme[clrchannel]})
+		end
+	end
+end
 local function init_gui()
 	if gui_ready then return end
 	local curtheme = get_theme()
@@ -506,12 +577,30 @@ local function init_gui()
 	main_container.Size = UDim2.fromScale(1,1)
 	main_container.BackgroundTransparency = 1
 	main_container.Parent = gui
+	main_container.Visible = false
 	stealth_container = Instance.new("Frame")
 	stealth_container.Name = "StealthContainer"
 	stealth_container.Size = UDim2.fromScale(1,1)
 	stealth_container.BackgroundTransparency = 1
 	stealth_container.Visible = false
 	stealth_container.Parent = gui
+	notif_container = Instance.new("ScrollingFrame")
+	notif_container.Name = "NotificationContainer"
+	notif_container.Parent = gui
+	notif_container.Visible = false
+	notif_container.Size = UDim2.new(0, 320, 1, 0)
+	notif_container.AnchorPoint = Vector2.new(1,0)
+	notif_container.Position = UDim2.new(1,0,0,0)
+	notif_container.Transparency = 1
+	notif_container.ScrollBarThickness = 2
+	local notif_layout = Instance.new("UIListLayout")
+	notif_layout.Parent = notif_container
+	notif_layout.Padding = UDim.new(0, 10)
+	notif_layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	notif_layout.VerticalAlignment = Enum.VerticalAlignment.Bottom
+	notif_layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+		notif_container.CanvasSize = UDim2.new(0,0,0,notif_layout.AbsoluteContentSize.Y)
+	end)
 	local startup_frame = Instance.new("Frame")
 	startup_frame.Name = "StartupFrame"
 	startup_frame.Size = UDim2.fromScale(1,1)
@@ -528,7 +617,6 @@ local function init_gui()
 	startup_text.TextColor3 = Color3.new(1,1,1)
 	startup_text.Font = Enum.Font.GothamBold
 	startup_text.Parent = startup_frame
-	main_container.Visible = false
 	local frame = Instance.new("Frame")
 	local toggle = Instance.new("TextButton")
 	local title = Instance.new("TextLabel")
@@ -538,14 +626,12 @@ local function init_gui()
 	frame.Name = "NiceUI_Main"
 	frame.Size = UDim2.new(0, 600, 0, 300)
 	frame.Position = UDim2.new(0, 20, 0, 20)
-	frame.BackgroundColor3 = curtheme["P1"]
 	frame.BackgroundTransparency = 0.4
 	frame.Parent = main_container
 	toggle.Name = "Toggle"
 	toggle.Size = UDim2.new(0, 64, 0, 32)
 	toggle.Position = UDim2.new(0.5, 0, 0, 0)
 	toggle.AnchorPoint = Vector2.new(0.5, 0)
-	toggle.BackgroundColor3 = curtheme["P2"]
 	toggle.BackgroundTransparency = 0.4
 	toggle.Text = system_name
 	toggle.TextScaled = true
@@ -563,13 +649,11 @@ local function init_gui()
 	tabs_frame.Name = "Tabs"
 	tabs_frame.Size = UDim2.new(0, 145, 1, -20)
 	tabs_frame.Position = UDim2.new(0, 0, 0, 20)
-	tabs_frame.BackgroundColor3 = curtheme["S1"]
 	tabs_frame.BackgroundTransparency = 0.5
 	tabs_frame.Parent = frame
 	content_frame.Name = "Content"
 	content_frame.Size = UDim2.new(1, -155, 1, -20)
 	content_frame.Position = UDim2.new(0, 155, 0, 20)
-	content_frame.BackgroundColor3 = curtheme["S2"]
 	content_frame.BackgroundTransparency = 0.5
 	content_frame.Parent = frame
 	tabs_layout.Padding = UDim.new(0, 6)
@@ -637,11 +721,13 @@ local function init_gui()
 	create_styles(content_frame)
 	make_draggable(toggle)
 	make_draggable(frame)
+	NiceUI.set_theme_changable(frame, "P1")
+	NiceUI.set_theme_changable(toggle, "P2")
+	NiceUI.set_theme_changable(tabs_frame, "S1")
+	NiceUI.set_theme_changable(content_frame, "S2")
 	curr_mframe = frame
 	currtabframe = tabs_frame
 	currbuttonsframe = content_frame
-	gui_ready = true
-	for tabName in pairs(pending_tabs) do NiceUI.create_tab(tabName) end
 	local libloaded = false
 	local function load_libraries()
 		if #libraries <= 0 then 
@@ -683,9 +769,12 @@ local function init_gui()
 		task.wait()
 	end
 	task.wait(2)
+	gui_ready = true
+	for tabName in pairs(pending_tabs) do NiceUI.create_tab(tabName) end
 	NiceUI.make_resizable(curr_mframe, Vector2.new(200, 150), Vector2.new(800, 600))
 	startup_frame.Visible = false
 	main_container.Visible = true
+	notif_container.Visible = true
 	_G.nice_gui.full_load = true
 	table.clear(pending_tabs)
 end
@@ -803,7 +892,6 @@ function NiceUI.create_click_button(name, tab, callback)
 	b.Text = name
 	b.TextScaled = true
 	b.Size = UDim2.new(1, 0, 0, 40)
-	b.BackgroundColor3 = Color3.fromRGB(0,0,0)
 	b.BackgroundTransparency = 0.4
 	b.TextColor3 = Color3.new(1,1,1)
 	b.Parent = parent_frame
@@ -811,6 +899,7 @@ function NiceUI.create_click_button(name, tab, callback)
 		if callback then sfunction(callback) end
 	end)
 	create_styles(b)
+	NiceUI.set_theme_changable(b, "S3")
 	local api = element_api(b)
 	api.OnClick = function(fn)
 		callback = fn
@@ -839,7 +928,6 @@ function NiceUI.create_slider(name, init_number, float_enabled, range, tab, call
 	local slide_frame = Instance.new("Frame")
 	slide_frame.Name = tostring(name)
 	slide_frame.Size = UDim2.new(1, 0, 0, 50)
-	slide_frame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 	slide_frame.BorderSizePixel = 1
 	slide_frame.Parent = parent_frame
 	local title = Instance.new("TextLabel")
@@ -861,16 +949,17 @@ function NiceUI.create_slider(name, init_number, float_enabled, range, tab, call
 	local slider_bar = Instance.new("Frame")
 	slider_bar.Size = UDim2.new(1, -20, 0, 6)
 	slider_bar.Position = UDim2.new(0, 10, 0, 24)
-	slider_bar.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
 	slider_bar.Parent = slide_frame
 	local slider_handle = Instance.new("Frame")
 	slider_handle.Size = UDim2.new(0, 12, 0, 12)
 	slider_handle.AnchorPoint = Vector2.new(0.5, 0.5)
 	slider_handle.Position = UDim2.new(0, 0, 0.5, -6)
-	slider_handle.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
 	slider_handle.BackgroundTransparency = 0.5
 	slider_handle.Parent = slider_bar
 	create_styles(slide_frame)
+	NiceUI.set_theme_changable(slide_frame, "S3")
+	NiceUI.set_theme_changable(slider_bar, "S2")
+	NiceUI.set_theme_changable(slider_handle, "S1")
 	local dragging = false
 	local syncing = false
 	local function format_value(v)
@@ -967,7 +1056,6 @@ function NiceUI.create_text_editor(name, text, tab, callback)
 	text_editor.Name = "TextEditor"
 	text_editor.Size = UDim2.new(1, -10, 0, 30)
 	text_editor.Position = UDim2.new(0, 5, 0, 15)
-	text_editor.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
 	text_editor.Text = tostring(text or "")
 	text_editor.TextColor3 = Color3.fromRGB(0, 0, 0)
 	text_editor.TextScaled = true
@@ -975,6 +1063,8 @@ function NiceUI.create_text_editor(name, text, tab, callback)
 	text_editor.Parent = te_frame
 	create_styles(te_frame)
 	create_styles(text_editor)
+	NiceUI.set_theme_changable(te_frame, "S3")
+	NiceUI.set_theme_changable(text_editor, "S2")
 	sfunction(function()
 		text_editor.FocusLost:Connect(function()
 			local new_text = text_editor.Text
@@ -1001,7 +1091,6 @@ function NiceUI.create_item_picker(name, items, default, tab, callback)
 	local picker_frame = Instance.new("Frame")
 	picker_frame.Name = name
 	picker_frame.Size = UDim2.new(1,0,0,80)
-	picker_frame.BackgroundColor3 = Color3.fromRGB(50,50,50)
 	picker_frame.Parent = parent_frame
 	local title = Instance.new("TextLabel")
 	title.Name = "Title"
@@ -1015,7 +1104,6 @@ function NiceUI.create_item_picker(name, items, default, tab, callback)
 	local button = Instance.new("TextButton")
 	button.Size = UDim2.new(1,-10,0,40)
 	button.Position = UDim2.new(0,5,0,15)
-	button.BackgroundColor3 = Color3.fromRGB(80,80,80)
 	button.TextColor3 = Color3.new(1,1,1)
 	button.TextScaled = true
 	button.TextXAlignment = Enum.TextXAlignment.Left
@@ -1025,7 +1113,6 @@ function NiceUI.create_item_picker(name, items, default, tab, callback)
 	dropdown.Visible = false
 	dropdown.Size = UDim2.new(1,-10,0,140)
 	dropdown.Position = UDim2.new(0,5,0,70)
-	dropdown.BackgroundColor3 = Color3.fromRGB(40,40,40)
 	dropdown.BorderSizePixel = 1
 	dropdown.ZIndex = picker_frame.ZIndex + 5
 	dropdown.Parent = picker_frame
@@ -1038,6 +1125,9 @@ function NiceUI.create_item_picker(name, items, default, tab, callback)
 	create_styles(picker_frame)
 	create_styles(button)
 	create_styles(dropdown)
+	NiceUI.set_theme_changable(picker_frame, "S3")
+	NiceUI.set_theme_changable(button, "S2")
+	NiceUI.set_theme_changable(dropdown, "S2")
 	local function close_dropdown()
 		dropdown.Visible = false
 		picker_frame.Size = UDim2.new(1,0,0,80)
@@ -1050,7 +1140,6 @@ function NiceUI.create_item_picker(name, items, default, tab, callback)
 			sfunction(function()
 				local b = Instance.new("TextButton")
 				b.Size = UDim2.new(1,-8,0,30)
-				b.BackgroundColor3 = Color3.fromRGB(70,70,70)
 				b.TextColor3 = Color3.new(1,1,1)
 				b.TextScaled = true
 				b.Text = tostring((item.Name or item) or "Err: NoName")
@@ -1418,13 +1507,11 @@ function NiceUI.create_popup(name, description, choices, callback)
 	return frame
 end
 function NiceUI.display_message(customtitle, customtext, customsound)
-	local nosound = (not customsound) or tostring(customsound) == ""
 	notify(
 		"NiceGui: "..tostring(customtitle),
 		"NiceGui: "..tostring(customtext),
 		1,
-		customsound,
-		nosound
+		customsound
 	)
 end
 set_theme(DEFAULT_THEME)
@@ -1448,7 +1535,7 @@ sfunction(function()
 			player_send_message(data.lines[randomIndex])
 		end
 	else
-		player_send_message("i love you")
+		--player_send_message("i love you")
 	end
 end)
 NiceUI.create_click_button(format_name_for_system("Activate Stealth Mode"), system_name, function() local a = {"Yes", "No"} NiceUI.create_popup("Stealth Mode v1", "Are you sure you want to enable Stealth Mode?\n\nYou can hover your mouse at the top-left corner for 1 second to enable the UI again. ", a, function(i) if i == a[1] then NiceUI.make_stealth_mode() end end) end)
@@ -1456,18 +1543,22 @@ NiceUI.create_slider(format_name_for_system("Master Volume"), 100, false, {0,100
 NiceUI.create_slider(format_name_for_system("UI Scale"), 100, false, {50,300}, system_name, function(a) NiceUI.set_scale(a) end)
 NiceUI.create_slider(format_name_for_system("Drag Smoothnes"), 30, false, {0, 200}, system_name, function(a) local a100 = a/100 smoothSpeed = tonumber(a100) or (30/100) end)
 NiceUI.create_boolean(format_name_for_system("Silent Mode"), false, system_name, function(b) silent_mode = b end)
--- theme_picker = NiceUI.create_item_picker(format_name_for_system("Themes"), themes, DEFAULT_THEME, system_name, function(selectedTheme)
--- 	NiceUI.set_theme(themes[selectedTheme]) 
--- end)
--- NiceUI.create_click_button(format_name_for_system("Themes [PLACEHOLDER]"), system_name, function()
--- 	NiceUI.create_popup("Theme picker PLACEHOLDER", "Pick a theme", themes, function(a)
--- 		if themes[a] then
--- 			set_theme(a) update_theme_picker() NiceUI.apply_theme()
--- 			print(a)
--- 		end
--- 	end)
--- end)
-update_theme_picker()
+local theme_names = {}
+for name in pairs(themes) do
+	table.insert(theme_names, name)
+end
+theme_picker = NiceUI.create_item_picker(
+	format_name_for_system("Themes"),
+	theme_names,
+	DEFAULT_THEME,
+	system_name,
+	function(selectedTheme)
+		if themes[selectedTheme] then
+			set_theme(selectedTheme)
+			NiceUI.apply_theme()
+		end
+	end
+)
 -- LocalPlayer.Destroying:Connect(function() playsound(sound_files.kicked, 10) end) -- ts doesnt even work twin [some00004]
 -- ====================
 -- DEBUG: YOU MUST TURN THIS OFF IN PUBLIC RELEASES
@@ -1475,9 +1566,34 @@ update_theme_picker()
 if RunService:IsStudio() then
 	sfunction(function()
 		player_send_message("NiceUI is best! [Studio Test]")
+		local __translatortxt = "hello"
+		local __translatorlangtarget = "en"
 		local debugname = system_name..":debug"
 		NiceUI.create_click_button("safe_function_err_test1", debugname, function() sfunction(nil) end)
-		NiceUI.create_click_button("safe_function_err_test2", debugname, function() sfunction(function() local house = nil house:Destroy() end) end)
+		NiceUI.create_click_button("safe_function_err_test2", debugname, function() for i = 1, 100 do sfunction(function() local house = nil house:Destroy() end) end end)
+		NiceUI.create_text_editor("translator_text_target", __translatortxt, debugname, function(txt)
+			__translatortxt = tostring(txt) and txt
+		end)
+		NiceUI.create_text_editor("translator_lang_target", __translatorlangtarget, debugname, function(txt)
+			__translatorlangtarget = tostring(txt) and txt
+		end)
+		NiceUI.create_click_button("translator_translate_process", debugname, function()
+			if not __translatortxt or __translatortxt == "" then return end
+			if not __translatorlangtarget or __translatorlangtarget == "" then return end
+			sfunction(function()
+				local __translator_translated = translate(__translatortxt, __translatorlangtarget)
+				if __translator_translated then	
+					NiceUI.display_message("debug.translator.result", tostring("D:translator.result="..__translator_translated))
+				else
+					NiceUI.display_message("debug:translator.result", "err:nil")
+				end
+			end)
+		end)
 	end)
 end
 return NiceUI
+-- EDITOR NOTE:
+--[[
+	i fixed it now twin, dw about a macOS user fixing shi
+					-some00004
+]]
