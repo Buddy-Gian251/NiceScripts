@@ -167,7 +167,6 @@ local function playsound(id, volume)
 	task.spawn(function()
 		while s and s.PlaybackSpeed and s.Playing do
 			if IsToday(4, 1) or RunService:IsStudio() then
-				task.wait()
 				local addspeed = math.random(-5, 5)
 				s.PlaybackSpeed += addspeed / 100
 			end
@@ -175,6 +174,7 @@ local function playsound(id, volume)
 		end
 	end)
 	s.Ended:Connect(function() s:Destroy() end)
+	task.wait()
 end
 local sfunction = function(func, ...)
 	if not func or typeof(func) ~= "function" then
