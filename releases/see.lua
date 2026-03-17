@@ -1,59 +1,62 @@
 local open_source = loadstring(game:HttpGet("https://github.com/Buddy-Gian251/NiceScripts/raw/main/releases/nice_template.lua"))()
-local gui = open_source.set_name('"SEE" cheats', 0.25)
-
+local gui = open_source.set_name('NiceFocus', 0.25)
 if type(_G.see) ~= "table" then _G.see = {} end
 if _G.see.loaded then
 	warn("SEE already loaded")
 	return
 end
 _G.see.loaded = true
-
 while not game:IsLoaded() do task.wait() end
-
+local guiParent = open_source.get_gui()
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
-
 local CONFIG = {
 	Enabled = false,
-
 	ShowFrames = true,
 	ShowLines = true,
 	ShowNames = true,
 	ShowHealth = true,
 	ShowDistance = false,
-
-	MaxDistance = 500,
+	highlightedPlayers = {},
+	MaxDistance = 2048,
 	LineOrigin = Vector2.new(0.5, 1),
+	SearchQuery = "",
+	DoubleClickTime = 0.35,
 }
-
 local ESP_STORE = {} -- [player] = {folder, conn}
-
+local TRACKED_PLAYERS = {} -- [player] = true
+local searchBox = Instance.new("TextBox")
+searchBox.Name = "SEE_Search"
+searchBox.Size = UDim2.fromOffset(220, 28)
+searchBox.AnchorPoint = Vector2.new(1,1)
+searchBox.Position = UDim2.new(1,-10,1,-10)
+searchBox.BackgroundTransparency = 0.25
+searchBox.PlaceholderText = "Search (d%displayname)"
+searchBox.Text = ""
+searchBox.ClearTextOnFocus = false
+searchBox.Parent = guiParent
+searchBox:GetPropertyChangedSignal("Text"):Connect(function()
+	local text = searchBox.Text:lower():gsub("^%s+", ""):gsub("%s+$", "")
+	CONFIG.SearchQuery = text
+end)
 local function removeESP(player)
 	local data = ESP_STORE[player]
 	if not data then return end
-
 	if data.conn then
 		data.conn:Disconnect()
 	end
-
 	if data.folder then
 		data.folder:Destroy()
 	end
-
 	ESP_STORE[player] = nil
 end
-
 local function createESP(player, hrp)
 	removeESP(player)
-
-	local guiParent = open_source.get_gui()
-
 	local folder = Instance.new("Folder")
 	folder.Name = "SEE_ESP_" .. player.UserId
 	folder.Parent = guiParent
-
 	local label = Instance.new("TextLabel")
 	label.Name = "NameLabel"
 	label.Size = UDim2.fromOffset(200, 18)
@@ -64,12 +67,22 @@ local function createESP(player, hrp)
 	label.TextColor3 = Color3.new(1,1,1)
 	label.Visible = false
 	label.Parent = folder
-
+	label.Active = true
+	local lastClick = 0
+	label.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			local now = tick()
+			if now - lastClick <= CONFIG.DoubleClickTime then
+				CONFIG.highlightedPlayers[player] =
+					not CONFIG.highlightedPlayers[player]
+			end
+			lastClick = now
+		end
+	end)
 	local stroke = Instance.new("UIStroke")
 	stroke.Thickness = 2
 	stroke.Color = Color3.new(0,0,0)
 	stroke.Parent = label
-
 	local box = Instance.new("Frame")
 	box.Name = "Box"
 	box.BackgroundTransparency = 0.5
@@ -77,7 +90,6 @@ local function createESP(player, hrp)
 	box.BorderColor3 = Color3.fromRGB(255,0,0)
 	box.Visible = false
 	box.Parent = folder
-
 	local line = Instance.new("Frame")
 	line.Name = "SnapLine"
 	line.AnchorPoint = Vector2.new(0, 0.5)
@@ -86,7 +98,6 @@ local function createESP(player, hrp)
 	line.Size = UDim2.fromOffset(0, 2)
 	line.Visible = false
 	line.Parent = folder
-
 	local conn
 	conn = RunService.RenderStepped:Connect(function()
 		if not CONFIG.Enabled or not hrp.Parent then
@@ -95,12 +106,10 @@ local function createESP(player, hrp)
 			line.Visible = false
 			return
 		end
-
 		local char = hrp.Parent
 		local hum = char:FindFirstChildOfClass("Humanoid")
 		local head = char:FindFirstChild("Head")
 		if not hum or not head then return end
-
 		local dist = (Camera.CFrame.Position - hrp.Position).Magnitude
 		if dist > CONFIG.MaxDistance then
 			label.Visible = false
@@ -108,7 +117,6 @@ local function createESP(player, hrp)
 			line.Visible = false
 			return
 		end
-
 		local rootPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
 		if not onScreen or rootPos.Z < 0 then
 			label.Visible = false
@@ -116,55 +124,74 @@ local function createESP(player, hrp)
 			line.Visible = false
 			return
 		end
-
+		local query = CONFIG.SearchQuery
+		if query ~= "" then
+			local name = player.Name:lower()
+			local display = player.DisplayName:lower()
+			if query:sub(1,2) == "!d%" then
+				if not display:find(query:sub(3), 1, true) then
+					label.Visible = false
+					box.Visible = false
+					line.Visible = false
+					return
+				end
+			else
+				if not name:find(query, 1, true) then
+					label.Visible = false
+					box.Visible = false
+					line.Visible = false
+					return
+				end
+			end
+		end
+		local highlighted = CONFIG.highlightedPlayers[player]
+		if highlighted then
+			label.Size = UDim2.fromOffset(400, 36)
+			label.TextTransparency = 0
+			box.BackgroundTransparency = 0.5
+		else
+			label.Size = UDim2.fromOffset(200, 18)
+			label.TextTransparency = 0
+			box.BackgroundTransparency = 0.5
+		end
 		local text = ""
 		if CONFIG.ShowNames then text = player.Name end
 		if CONFIG.ShowHealth then text ..= " [" .. math.floor(hum.Health) .. "]" end
 		if CONFIG.ShowDistance then text ..= " [" .. math.floor(dist) .. "m]" end
-
 		if text ~= "" then
 			label.Text = text
-
 			if player.Team then
 				label.TextColor3 = player.TeamColor.Color
 			else
 				label.TextColor3 = Color3.new(1, 1, 1)
 			end
-		
 			label.Position = UDim2.fromOffset(rootPos.X, rootPos.Y - 20)
 			label.Visible = true
 		else
 			label.Visible = false
 		end
-
-		-- BOX
 		if CONFIG.ShowFrames then
 			local top = Camera:WorldToViewportPoint(head.Position + Vector3.new(0,0.3,0))
 			local bottom = Camera:WorldToViewportPoint(
 				hrp.Position - Vector3.new(0, hum.HipHeight, 0)
 			)
-
 			local h = math.abs(bottom.Y - top.Y)
 			local w = h / 2
-
 			box.Size = UDim2.fromOffset(w, h)
 			box.Position = UDim2.fromOffset(top.X - w/2, top.Y)
 			box.Visible = true
 		else
 			box.Visible = false
 		end
-
 		if CONFIG.ShowLines then
 			local from = Vector2.new(
 				Camera.ViewportSize.X * CONFIG.LineOrigin.X,
 				Camera.ViewportSize.Y * CONFIG.LineOrigin.Y
 			)
 			local to = Vector2.new(rootPos.X, rootPos.Y)
-
 			local d = to - from
 			local len = d.Magnitude
 			local ang = math.deg(math.atan2(d.Y, d.X))
-
 			line.Position = UDim2.fromOffset(from.X, from.Y)
 			line.Size = UDim2.fromOffset(len, 2)
 			line.Rotation = ang
@@ -173,51 +200,75 @@ local function createESP(player, hrp)
 			line.Visible = false
 		end
 	end)
-
 	ESP_STORE[player] = { folder = folder, conn = conn }
 end
-
-local function hookPlayer(player)
-	if player == LocalPlayer then return end
-
-	player.CharacterAdded:Connect(function(char)
-		local hrp = char:WaitForChild("HumanoidRootPart", 5)
-		if hrp then createESP(player, hrp) end
-	end)
-
-	player.CharacterRemoving:Connect(function()
-		removeESP(player)
-	end)
-
-	if player.Character then
-		local hrp = player.Character:FindFirstChild("HumanoidRootPart")
-		if hrp then createESP(player, hrp) end
-	end
+local function addPlayer(player)
+	if player == LocalPlayer and not CONFIG.IncludeSelf then return end
+	TRACKED_PLAYERS[player] = true
 end
-
+local function removePlayer(player)
+	TRACKED_PLAYERS[player] = nil
+	removeESP(player)
+end
 for _, p in ipairs(Players:GetPlayers()) do
-	hookPlayer(p)
+	addPlayer(p)
 end
-Players.PlayerAdded:Connect(hookPlayer)
-Players.PlayerRemoving:Connect(removeESP)
-open_source.create_boolean("Toggle SEE", false, "ESP", function(a)
+Players.PlayerAdded:Connect(addPlayer)
+Players.PlayerRemoving:Connect(removePlayer)
+task.spawn(function()
+	while true do
+		for player in pairs(TRACKED_PLAYERS) do
+			if not player.Parent then
+				removePlayer(player)
+				continue
+			end
+			local char = player.Character
+			if char then
+				local hrp = char:FindFirstChild("HumanoidRootPart")
+				if hrp and not ESP_STORE[player] then
+					createESP(player, hrp)
+				end
+			else
+				if ESP_STORE[player] then
+					removeESP(player)
+				end
+			end
+		end
+		task.wait(4)
+	end
+end)
+local tabnames = {
+	"main-focus.json",
+	"config.json",
+	"misc.json"
+}
+open_source.create_boolean("Toggle NiceFocus", false, tabnames[1], function(a)
 	CONFIG.Enabled = a
 end)
-open_source.create_boolean("Toggle Frames", true, "ESP", function(a)
+open_source.create_boolean("Toggle Frames", true, tabnames[1], function(a)
 	CONFIG.ShowFrames = a
 end)
-open_source.create_boolean("Toggle Lines", true, "ESP", function(a)
+open_source.create_boolean("Toggle Lines", true, tabnames[1], function(a)
 	CONFIG.ShowLines = a
 end)
-open_source.create_boolean("Toggle Names", true, "ESP", function(a)
+open_source.create_boolean("Toggle Names", true, tabnames[1], function(a)
 	CONFIG.ShowNames = a
 end)
-open_source.create_boolean("Toggle Health", true, "ESP", function(a)
+open_source.create_boolean("Toggle Health", true, tabnames[1], function(a)
 	CONFIG.ShowHealth = a
 end)
-open_source.create_boolean("Toggle Distance", true, "ESP", function(a)
+open_source.create_boolean("Toggle Distance", true, tabnames[1], function(a)
 	CONFIG.ShowDistance = a
 end)
-open_source.create_slider("Max Distance", 500, false, {256, 16384}, "Configuration", function(a)
+open_source.create_boolean("Include yourself", false, tabnames[3], function(a)
+	CONFIG.IncludeSelf = a
+	if a then
+		TRACKED_PLAYERS[LocalPlayer] = true
+	else
+		TRACKED_PLAYERS[LocalPlayer] = nil
+		removeESP(LocalPlayer)
+	end
+end)
+open_source.create_slider("Max Distance", 500, false, {256, 16384}, tabnames[2], function(a)
 	CONFIG.MaxDistance = a
 end)
