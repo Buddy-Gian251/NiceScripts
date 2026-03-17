@@ -1,6 +1,10 @@
 local NiceUI = {} -- root of nicehouse10000e's modular UI
 if not _G.nice_gui then _G.nice_gui = {} end 
 _G.nice_gui.version = "153" 
+if tonumber(_G.nice_gui.version) >= 155 then
+	error("GitHub source code detected, use Pastebin instead.")
+	return
+end
 _G.nice_gui.beta = false
 _G.nice_gui.full_load = false
 print("INITIALIZED: VERSION:".._G.nice_gui.version.."; BETA:"..tostring(_G.nice_gui.beta))
@@ -799,6 +803,7 @@ local function init_gui()
 	_G.nice_gui.full_load = true
 	table.clear(pending_tabs)
 	notify("NiceUI loaded", "NiceUI has successfully loaded, you can now interact with elements.")
+	notify("Source Code Host transfered", "Please rely on Pastebin as the main source code in GitHub is coming to an end [GITHUB UP TO v155 ONLY]."
 end
 function NiceUI.set_scale(scale)
 	scale = math.clamp(scale, 50, 300)
