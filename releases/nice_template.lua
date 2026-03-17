@@ -170,8 +170,8 @@ local function playsound(id, volume)
 	s:Play()
 	task.spawn(function()
 		while s and s.PlaybackSpeed and s.Playing do
+			task.wait()
 			if IsToday(4, 1) or RunService:IsStudio() then
-				task.wait()
 				local addspeed = math.random(-5, 5)
 				s.PlaybackSpeed += addspeed / 100
 			end
