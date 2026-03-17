@@ -2,6 +2,8 @@
 ### Where ideas turn into reality
 ### By nicehouse10000e and some00004 (Roblox users)
 
+MOVED TO PASTEBIN: https://pastebin.com/ehm4i3FX
+
 # Introduction
 NiceScripts (also known as NicePrograms) is a large-scale project that began on November 27, 2025, and is still actively being developed.
 
