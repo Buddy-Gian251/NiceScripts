@@ -56,23 +56,16 @@ do local success, result = pcall(function()
 		end end)
 	PARENT = (success and result) or LocalPlayer:WaitForChild("PlayerGui")
 end
-local link_fetchable = function()
+local load_url = function(url)
 	local success, result = pcall(function()
-		return game:HttpGet("https://github.com")
+		return game:HttpGet(url)
 	end)
 	if success then
-		return true
+		return result
 	else
-		return false
+		warn("HttpGet failed:", result)
+		return nil
 	end
-end
-local load_url = function(url)
-	if not link_fetchable() then return end
-	local success, result = pcall(function()
-		local response = game:HttpGet(url)
-		return response
-	end)
-	return success and result or nil
 end
 local gui = Instance.new("ScreenGui")
 local sandboxgui = Instance.new("ScreenGui")
