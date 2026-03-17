@@ -56,7 +56,18 @@ do local success, result = pcall(function()
 		end end)
 	PARENT = (success and result) or LocalPlayer:WaitForChild("PlayerGui")
 end
+local link_fetchable = function()
+	local success, result = pcall(function()
+		return game:HttpGet("https://github.com")
+	end)
+	if success then
+		return true
+	else
+		return false
+	end
+end
 local load_url = function(url)
+	if not link_fetchable() then return end
 	local success, result = pcall(function()
 		local response = game:HttpGet(url)
 		return response
@@ -167,11 +178,11 @@ local function playsound(id, volume)
 	task.spawn(function()
 		while s and s.PlaybackSpeed and s.Playing do
 			if IsToday(4, 1) or RunService:IsStudio() then
+				task.wait()
 				local addspeed = math.random(-5, 5)
 				s.PlaybackSpeed += addspeed / 100
 			end
 			s.Volume = (volume or 1) * get_mastervolume()
-			task.wait()
 		end
 	end)
 	s.Ended:Connect(function() s:Destroy() end)
@@ -180,16 +191,20 @@ local sfunction = function(func, ...)
 	if not func or typeof(func) ~= "function" then
 		return
 	end
-	local success, err = pcall(func, ...)
-	if not success then
-		local Text = "NiceUI SafeFunction error: " .. tostring(err)
-		if game.TextChatService.TextChannels.RBXGeneral then
-			pcall(function()
-				game.TextChatService.TextChannels.RBXGeneral:DisplaySystemMessage(Text)
-			end)
+	if not RunService:IsStudio() then
+		local success, err = pcall(func, ...)
+		if not success then
+			local Text = "NiceUI SafeFunction error: " .. tostring(err)
+			if game.TextChatService.TextChannels.RBXGeneral then
+				pcall(function()
+					game.TextChatService.TextChannels.RBXGeneral:DisplaySystemMessage(Text)
+				end)
+			end
+			playsound(sound_files.err, 10)
+			warn("Function error:", err)
 		end
-		playsound(sound_files.err, 10)
-		warn("Function error:", err)
+	else
+		func(...)
 	end
 end
 local function create_styles(item)
@@ -283,6 +298,7 @@ end
 local function notify(title, text, dur, no_sound)
 	local s, e = pcall(function() 
 		if not notif_container then return end
+		if not dur then dur = 10 end
 		local notifbox = Instance.new("Frame")
 		local titletxt = Instance.new("TextLabel")
 		local texttxt = Instance.new("TextLabel")
@@ -290,23 +306,24 @@ local function notify(title, text, dur, no_sound)
 		notifbox.Size = UDim2.new(1, -20, 0, 0)
 		notifbox.BackgroundTransparency = 0.5
 		titletxt.Parent = notifbox
-		titletxt.Size = UDim2.new(1, 0, 0, 60)
-		titletxt.BackgroundTransparency = 1
+		titletxt.Size = UDim2.new(1, 0, 0, 20)
+		titletxt.BackgroundTransparency = 0.5
 		titletxt.Text = tostring(title) or "Untitled"
 		titletxt.TextWrapped = true
 		titletxt.TextXAlignment = Enum.TextXAlignment.Left
 		texttxt.Parent = notifbox
-		texttxt.Size = UDim2.new(1, 0, 1, -60)
+		texttxt.Size = UDim2.new(1, 0, 1, -20)
 		texttxt.BackgroundTransparency = 1
 		texttxt.Position = UDim2.new(0, 0, 0, 60)
 		texttxt.Text = tostring(text) or "No description provided."
 		texttxt.TextWrapped = true
 		texttxt.TextXAlignment = Enum.TextXAlignment.Left
+		texttxt.TextYAlignment = Enum.TextYAlignment.Top
 		NiceUI.set_theme_changable(notifbox, "S1")
 		create_styles(notifbox)
 		univ_tween(notifbox, {1,Enum.EasingStyle.Circular, Enum.EasingDirection.Out},{Size=UDim2.new(1, -20, 0, 120)}, function()
-			Debris:AddItem(notifbox, (dur+3 or 13))
-			task.delay(dur or 10, function()
+			Debris:AddItem(notifbox, dur+3)
+			task.delay(dur, function()
 				univ_tween(notifbox, {1,Enum.EasingStyle.Circular, Enum.EasingDirection.Out},{Size=UDim2.new(1, -20, 0, 0)}, function()
 					notifbox:Destroy()
 				end)
@@ -597,7 +614,7 @@ local function init_gui()
 	stealth_container.BackgroundTransparency = 1
 	stealth_container.Visible = false
 	stealth_container.Parent = gui
-	notif_container = Instance.new("ScrollingFrame")
+	notif_container = Instance.new("Frame")
 	notif_container.Name = "NotificationContainer"
 	notif_container.Parent = gui
 	notif_container.Visible = false
@@ -605,15 +622,11 @@ local function init_gui()
 	notif_container.AnchorPoint = Vector2.new(1,0)
 	notif_container.Position = UDim2.new(1,0,0,0)
 	notif_container.Transparency = 1
-	notif_container.ScrollBarThickness = 2
 	local notif_layout = Instance.new("UIListLayout")
 	notif_layout.Parent = notif_container
 	notif_layout.Padding = UDim.new(0, 10)
 	notif_layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 	notif_layout.VerticalAlignment = Enum.VerticalAlignment.Bottom
-	notif_layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-		notif_container.CanvasSize = UDim2.new(0,0,0,notif_layout.AbsoluteContentSize.Y)
-	end)
 	local startup_frame = Instance.new("Frame")
 	startup_frame.Name = "StartupFrame"
 	startup_frame.Size = UDim2.fromScale(1,1)
@@ -792,6 +805,7 @@ local function init_gui()
 	notif_container.Visible = true
 	_G.nice_gui.full_load = true
 	table.clear(pending_tabs)
+	notify("NiceUI loaded", "NiceUI has successfully loaded, you can now interact with elements.")
 end
 function NiceUI.set_scale(scale)
 	scale = math.clamp(scale, 50, 300)
@@ -1555,7 +1569,7 @@ sfunction(function()
 		local data
 		sfunction(function()
 			url = load_url("https://raw.githubusercontent.com/Buddy-Gian251/NiceScripts/main/misc/niceui_lines.json")
-			data = HttpService:JSONDecode(url)
+			if url then data = HttpService:JSONDecode(url) end
 		end)
 		NiceUI.create_theme("April", {
 			P1 = Color3.new(0, 0, 0),
