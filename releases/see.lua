@@ -205,6 +205,16 @@ end
 local function addPlayer(player)
 	if player == LocalPlayer and not CONFIG.IncludeSelf then return end
 	TRACKED_PLAYERS[player] = true
+	local function onCharacter(char)
+		local hrp = char:WaitForChild("HumanoidRootPart", 5)
+		if hrp then
+			createESP(player, hrp)
+		end
+	end
+	player.CharacterAdded:Connect(onCharacter)
+	if player.Character then
+		onCharacter(player.Character)
+	end
 end
 local function removePlayer(player)
 	TRACKED_PLAYERS[player] = nil
