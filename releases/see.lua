@@ -212,6 +212,9 @@ local function addPlayer(player)
 		end
 	end
 	player.CharacterAdded:Connect(onCharacter)
+	player.CharacterRemoving:Connect(function()
+		removeESP(player)
+	end)
 	if player.Character then
 		onCharacter(player.Character)
 	end
@@ -225,28 +228,28 @@ for _, p in ipairs(Players:GetPlayers()) do
 end
 Players.PlayerAdded:Connect(addPlayer)
 Players.PlayerRemoving:Connect(removePlayer)
-task.spawn(function()
-	while true do
-		for player in pairs(TRACKED_PLAYERS) do
-			if not player.Parent then
-				removePlayer(player)
-				continue
-			end
-			local char = player.Character
-			if char then
-				local hrp = char:FindFirstChild("HumanoidRootPart")
-				if hrp and not ESP_STORE[player] then
-					createESP(player, hrp)
-				end
-			else
-				if ESP_STORE[player] then
-					removeESP(player)
-				end
-			end
-		end
-		task.wait(4)
-	end
-end)
+-- task.spawn(function()
+-- 	while true do
+-- 		for player in pairs(TRACKED_PLAYERS) do
+-- 			if not player.Parent then
+-- 				removePlayer(player)
+-- 				continue
+-- 			end
+-- 			local char = player.Character
+-- 			if char then
+-- 				local hrp = char:FindFirstChild("HumanoidRootPart")
+-- 				if hrp and not ESP_STORE[player] then
+-- 					createESP(player, hrp)
+-- 				end
+-- 			else
+-- 				if ESP_STORE[player] then
+-- 					removeESP(player)
+-- 				end
+-- 			end
+-- 		end
+-- 		task.wait(4)
+-- 	end
+-- end)
 local tabnames = {
 	"main-focus.json",
 	"config.json",
