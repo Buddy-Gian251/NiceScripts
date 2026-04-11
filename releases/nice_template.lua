@@ -1,9 +1,25 @@
 local NiceUI = {} -- root of nicehouse10000e's modular UI
 if not _G.nice_gui then _G.nice_gui = {} end 
-_G.nice_gui.version = "153" 
+_G.nice_gui.version = "154" 
 _G.nice_gui.beta = false
 _G.nice_gui.full_load = false
 print("INITIALIZED: VERSION:".._G.nice_gui.version.."; BETA:"..tostring(_G.nice_gui.beta))
+local debugmode = {
+	["enabled"] = false, 
+	["studiomode"] = true, 
+	["safemode"] = true, 
+	["aprilmode"] = true,
+}
+local function get_debug_setting(name)
+	if not name then return end
+	if debugmode.enabled then
+		return debugmode[name]
+	end
+	return nil
+end
+local pin_ui_frame
+local PIN = ""
+local PIN_ENABLED = false
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -21,7 +37,12 @@ local sound_files = {
 	close = "rbxassetid://99276942443345",
 	open = "rbxassetid://987728667",
 	kicked = "rbxassetid://5204290066",
-	p_off = "rbxassetid://6858975342"
+	p_off = "rbxassetid://6858975342",
+	PIN_SYSTEM = {
+		incorrect = "rbxassetid://139463204474326",
+		correct = "rbxassetid://139297469169461",
+		click = "rbxassetid://90691043754990"
+	}
 }
 local libraries = {
 	{ Name = "NSK", Source = 'https://raw.githubusercontent.com/Buddy-Gian251/NiceScripts/main/releases/NiceScreenKeyboard.lua' } --{ Name = "TweenLib", Source = script.TweenLib },{ Name = "MyURLLib", Source = "https://example.com/lib.lua" },{ Name = "FunctionLib", Source = function() print("Hello") return { Test = true } end }
@@ -112,7 +133,7 @@ local data2 = {}
 local mainframe_tweenlocked = false
 local current_theme
 local system_name = "NiceUI" -- APRIL FOOLS : Yeongsung UI
-if IsToday(4, 1) or RunService:IsStudio() then
+if IsToday(4, 1) or get_debug_setting("studiomode") then
 	system_name = "Yeongsung UI"
 end
 local frame_data = {}
@@ -171,30 +192,30 @@ local function playsound(id, volume)
 	task.spawn(function()
 		while s and s.PlaybackSpeed and s.Playing do
 			task.wait()
-			if IsToday(4, 1) or RunService:IsStudio() then
+			if get_debug_setting("aprilmode") or get_debug_setting("studiomode") then
 				local addspeed = math.random(-5, 5)
 				s.PlaybackSpeed += addspeed / 100
 			end
-			s.Volume = (volume or 1) * get_mastervolume()
+			if silent_mode then
+				s.Volume = 0
+			else
+				s.Volume = (volume or 1) * get_mastervolume()
+			end
 		end
 	end)
 	s.Ended:Connect(function() s:Destroy() end)
 end
+local sfunction_senderrqueue = {}
+
 local sfunction = function(func, ...)
 	if not func or typeof(func) ~= "function" then
 		return
 	end
-	if not RunService:IsStudio() then
+	if get_debug_setting("safemode") then
 		local success, err = pcall(func, ...)
 		if not success then
 			local Text = "NiceUI SafeFunction error: " .. tostring(err)
-			if game.TextChatService.TextChannels.RBXGeneral then
-				pcall(function()
-					game.TextChatService.TextChannels.RBXGeneral:DisplaySystemMessage(Text)
-				end)
-			end
-			playsound(sound_files.err, 10)
-			warn("Function error:", err)
+			table.insert(sfunction_senderrqueue, Text)
 		end
 	else
 		func(...)
@@ -243,6 +264,12 @@ local function translate(text, target)
 		return body[1][1][1]
 	end
 	return nil
+end
+local function is_correct_pin(pin)
+	if type(pin) ~= "string" then
+		return false
+	end
+	return pin == PIN
 end
 local function tween_prop(obj, props) local t = TweenService:Create( obj, TweenInfo.new(THEME_FADE_TIME, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), props )t:Play() end
 local frame_data = {}
@@ -295,29 +322,30 @@ local function notify(title, text, dur, no_sound)
 		local notifbox = Instance.new("Frame")
 		local titletxt = Instance.new("TextLabel")
 		local texttxt = Instance.new("TextLabel")
+		local titleheight = 20
 		notifbox.Parent = notif_container
 		notifbox.Size = UDim2.new(1, -20, 0, 0)
-		notifbox.BackgroundTransparency = 0.5
+		notifbox.BackgroundTransparency = 0.2
 		titletxt.Parent = notifbox
-		titletxt.Size = UDim2.new(1, 0, 0, 20)
-		titletxt.BackgroundTransparency = 0.5
+		titletxt.Size = UDim2.new(1, 0, 0, titleheight)
+		titletxt.BackgroundTransparency = 0.2
 		titletxt.Text = tostring(title) or "Untitled"
 		titletxt.TextWrapped = true
 		titletxt.TextXAlignment = Enum.TextXAlignment.Left
 		texttxt.Parent = notifbox
-		texttxt.Size = UDim2.new(1, 0, 1, -20)
+		texttxt.Size = UDim2.new(1, 0, 1, -titleheight)
 		texttxt.BackgroundTransparency = 1
-		texttxt.Position = UDim2.new(0, 0, 0, 60)
+		texttxt.Position = UDim2.new(0, 0, 0, titleheight)
 		texttxt.Text = tostring(text) or "No description provided."
 		texttxt.TextWrapped = true
 		texttxt.TextXAlignment = Enum.TextXAlignment.Left
 		texttxt.TextYAlignment = Enum.TextYAlignment.Top
 		NiceUI.set_theme_changable(notifbox, "S1")
 		create_styles(notifbox)
-		univ_tween(notifbox, {1,Enum.EasingStyle.Circular, Enum.EasingDirection.Out},{Size=UDim2.new(1, -20, 0, 120)}, function()
+		univ_tween(notifbox, {0.5,Enum.EasingStyle.Circular, Enum.EasingDirection.Out},{Size=UDim2.new(1, -20, 0, 120)}, function()
 			Debris:AddItem(notifbox, dur+3)
 			task.delay(dur, function()
-				univ_tween(notifbox, {1,Enum.EasingStyle.Circular, Enum.EasingDirection.Out},{Size=UDim2.new(1, -20, 0, 0)}, function()
+				univ_tween(notifbox, {0.5,Enum.EasingStyle.Circular, Enum.EasingDirection.Out},{Size=UDim2.new(0, 0, 0, 0)}, function()
 					notifbox:Destroy()
 				end)
 			end)
@@ -692,9 +720,8 @@ local function init_gui()
 	toggle.Activated:Connect(function()
 		if next(currently_dragged) then return end
 		if mainframe_tweenlocked then return end
-		local apr = IsToday(4, 1)
 		mainframe_tweenlocked = true
-		local __tweentime = 0.3
+		local __tweentime = 0.25
 		local data = get_frame_data(frame)
 		if not data then
 			data = {
@@ -706,8 +733,11 @@ local function init_gui()
 			write_frame_data(frame, data)
 		end
 		local is_open = not data.visible
+		if not is_open then
+			tabs_frame.Visible = false
+			content_frame.Visible = false
+		end
 		frame.Visible = true
-		playsound(is_open and sound_files.open or sound_files.close, 3)
 		if is_open then
 			frame.Position = toggle.Position
 			frame.Size = UDim2.new(0,0,0,0)
@@ -720,10 +750,13 @@ local function init_gui()
 			Size = is_open and data.default_size or UDim2.new(0,0,0,0),
 			Position = is_open and data.default_pos or toggle.Position,
 			BackgroundTransparency = is_open and data.default_transparency or 1,
-			Rotation = is_open and 0 or 180
+			Rotation = is_open and 0 or 640
 		}, function()
 			if not is_open then
 				frame.Visible = false
+			else
+				tabs_frame.Visible = true
+				content_frame.Visible = true
 			end
 			mainframe_tweenlocked = false
 		end)
@@ -800,6 +833,127 @@ local function init_gui()
 	table.clear(pending_tabs)
 	notify("NiceUI loaded", "NiceUI has successfully loaded, you can now interact with elements.")
 end
+function NiceUI.show_pin_login(onSuccess)
+	if not PIN_ENABLED then
+		if onSuccess then onSuccess(true) end
+		return
+	end
+	if pin_ui_frame then pin_ui_frame:Destroy() end
+	local _inputPIN = ""
+	pin_ui_frame = Instance.new("Frame")
+	pin_ui_frame.Name = "PIN_Login"
+	pin_ui_frame.Size = UDim2.fromOffset(300, 300)
+	pin_ui_frame.Position = UDim2.new(0.5, -300, 0.5, -150)
+	pin_ui_frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+	pin_ui_frame.Parent = gui
+	create_styles(pin_ui_frame)	
+	local box = Instance.new("TextBox")
+	box.Size = UDim2.new(1, -20, 0, 40)
+	box.Position = UDim2.new(0, 10, 0, 60)
+	box.PlaceholderText = "PIN"
+	box.Text = ""
+	box.TextScaled = true
+	box.ClearTextOnFocus = false
+	box.Parent = pin_ui_frame
+	box.FocusLost:Connect(function() _inputPIN = box.Text end)
+	local function try_pin()
+		if is_correct_pin(_inputPIN) then
+			playsound(sound_files.PIN_SYSTEM.correct, 1)
+			task.wait(1)
+			if pin_ui_frame then
+				pin_ui_frame:Destroy()
+				pin_ui_frame = nil
+			end
+			if onSuccess then
+				playsound(sound_files.open, 3)
+				onSuccess(true)
+			end
+		else
+			playsound(sound_files.PIN_SYSTEM.incorrect, 1)
+			box.Text = ""
+		end
+	end
+	local noKeyboardBtn = Instance.new("TextButton")
+	noKeyboardBtn.Name = "NoKeyboard"
+	noKeyboardBtn.Size = UDim2.new(0, 120, 0, 30)
+	noKeyboardBtn.Position = UDim2.new(0, 10, 1, -40)
+	noKeyboardBtn.Text = "No Keyboard"
+	noKeyboardBtn.Parent = pin_ui_frame
+	noKeyboardBtn.BackgroundTransparency = 1
+	noKeyboardBtn.TextColor3 = Color3.new(0, 0.5, 1)
+	local keypadFrame = Instance.new("Frame")
+	keypadFrame.Name = "Keypad"
+	keypadFrame.Size = UDim2.new(0, 200, 0, 260)
+	keypadFrame.Position = UDim2.new(0.5, 200, 0.5, -130)
+	keypadFrame.Visible = false
+	keypadFrame.Parent = pin_ui_frame
+	create_styles(keypadFrame)
+	local layout = Instance.new("UIGridLayout")
+	layout.CellSize = UDim2.new(0, 60, 0, 30)
+	layout.CellPadding = UDim2.new(0, 5, 0, 5)
+	layout.Parent = keypadFrame
+	local function createKey(text)
+		local btn = Instance.new("TextButton")
+		btn.Size = UDim2.new(0, 60, 0, 30)
+		btn.Text = text
+		btn.Parent = keypadFrame
+		create_styles(btn)
+		btn.MouseButton1Click:Connect(function()
+			playsound(sound_files.PIN_SYSTEM.click, 0.8)
+			if text == "CLEAR" then
+				_inputPIN = ""
+			elseif text == "ENTER" then
+				try_pin()
+			else
+				_inputPIN = _inputPIN .. text
+			end
+			box.Text = _inputPIN
+			print("Current PIN:", _inputPIN)
+		end)
+	end
+	for i = 1, 9 do
+		createKey(tostring(i))
+	end
+	createKey("0")
+	createKey("CLEAR")
+	createKey("ENTER")
+	noKeyboardBtn.MouseButton1Click:Connect(function()
+		keypadFrame.Visible = not keypadFrame.Visible
+	end)
+	local title = Instance.new("TextLabel")
+	title.Size = UDim2.new(1, 0, 0, 40)
+	title.BackgroundTransparency = 1
+	title.Text = "Enter PIN"
+	title.TextScaled = true
+	title.TextColor3 = Color3.new(1,1,1)
+	title.Parent = pin_ui_frame
+	local button = Instance.new("TextButton")
+	button.Size = UDim2.new(1, -20, 0, 40)
+	button.Position = UDim2.new(0, 10, 0, 110)
+	button.Text = "Unlock"
+	button.TextScaled = true
+	button.Parent = pin_ui_frame
+	create_styles(box)
+	create_styles(button)
+	button.MouseButton1Click:Connect(try_pin)
+	box.FocusLost:Connect(function(enterPressed)
+		if enterPressed then
+			try_pin()
+		end
+	end)
+end
+function NiceUI.require_pin()
+	if PIN_ENABLED then
+		NiceUI.show_pin_login(function()
+			if main_container then
+				main_container.Visible = true
+			end
+		end)
+		if main_container then
+			main_container.Visible = false
+		end
+	end
+end
 function NiceUI.set_scale(scale)
 	scale = math.clamp(scale, 50, 300)
 	defscale = scale
@@ -809,8 +963,14 @@ function NiceUI.set_scale(scale)
 		end)
 	end
 end
-function NiceUI.create_gui(name, gui_smoothness)
-	NiceUI.display_message("Oh No! Deprecated?", "Sorry, this function is deprecated and will be removed completely in version 154. Please use NiceUI.set_name(name) instead!")
+function NiceUI.lock(_pin,_lock,_requireOnStart)
+	if _pin and typeof(_pin) == "string" and _lock and _lock == true then
+		PIN_ENABLED = _lock
+		PIN = _pin
+		if _requireOnStart then
+			NiceUI.require_pin()
+		end
+	end
 end
 function NiceUI.get_gui() return sandboxgui end
 function NiceUI.set_name(name)
@@ -1553,6 +1713,21 @@ init_gui()
 while _G.nice_gui.full_load == false do
 	task.wait()
 end
+task.spawn(function()
+	while true do
+		task.wait()
+		if #sfunction_senderrqueue > 0 then
+			local Text = table.remove(sfunction_senderrqueue, 1)
+			if game.TextChatService.TextChannels.RBXGeneral then
+				pcall(function()
+					game.TextChatService.TextChannels.RBXGeneral:DisplaySystemMessage(Text)
+				end)
+			end
+			playsound(sound_files.err, 10)
+			warn("Function error:", Text)
+		end
+	end
+end)
 local sent_tag___ = false
 sfunction(function()
 	if sent_tag___ then return end
@@ -1581,6 +1756,7 @@ sfunction(function()
 		--player_send_message("i love you")
 	end
 end)
+NiceUI.create_popup("Sorry...","Active development will be delayed for a while.",{"OK"},function() notify("We're sorry", "We're sorry"  ) end)
 NiceUI.create_click_button(format_name_for_system("Activate Stealth Mode"), system_name, function() local a = {"Yes", "No"} NiceUI.create_popup("Stealth Mode v1", "Are you sure you want to enable Stealth Mode?\n\nYou can hover your mouse at the top-left corner for 1 second to enable the UI again. ", a, function(i) if i == a[1] then NiceUI.make_stealth_mode() end end) end)
 NiceUI.create_slider(format_name_for_system("Master Volume"), 100, false, {0,100}, system_name, function(a) master_volume = a end)
 NiceUI.create_slider(format_name_for_system("UI Scale"), 100, false, {50,300}, system_name, function(a) NiceUI.set_scale(a) end)
@@ -1606,52 +1782,53 @@ theme_picker = NiceUI.create_item_picker(
 -- ====================
 -- DEBUG: YOU MUST TURN THIS OFF IN PUBLIC RELEASES
 -- ====================
-local c = NiceUI.create_click_button(".", [[!@#$%^&*()_+{}:|<>?1234567890-=[];'\,./'sil]], function()
+if get_debug_setting("enabled") then
 	sfunction(function()
-		local languages = {
-			{ name="German", code="de" },
-			{ name="English", code="en" },
-			{ name="Russian", code="ru" },
-			{ name="Swedish", code="sv" },
-			{ name="Finnish", code="fi" },
-			{ name="Greek", code="el" },
-			{ name="Arabic", code="ar" },
-			{ name="Simplified Chinese", code="zh-CN" },
-			{ name="Traditional Chinese", code="zh-TW" },
-			{ name="Thai", code="th" },
-			{ name="Hebrew", code="he" },
-			{ name="Portuguese (Brazil)", code="pt-BR" },
-			{ name="Portuguese (Portugal)", code="pt-PT" },
-			{ name="Spanish", code="es" },
-			{ name="French", code="fr" },
-			{ name="Czech", code="cs" },
-			{ name="Bulgarian", code="bg" },
-			{ name="Ukrainian", code="uk" },
-			{ name="Danish", code="da" },
-			{ name="Indonesian", code="id" },
-			{ name="Malay", code="ms" },
-			{ name="Azerbaijani", code="az" },
-			{ name="Japanese", code="ja" },
-			{ name="Korean", code="ko" }
-		}
-		local function translate_everything()
-			local lang = languages[math.random(1,#languages)]
-			local code = lang.code
-			notify("Translator", "Translating UI to "..lang.name.." ...", 3)
-			for _,obj in ipairs(gui:GetDescendants()) do
-				if obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox") then
-					local original = obj.Text
-					if original and original ~= "" then
-						task.spawn(function()
-							local translated = translate(original, code)
-							if translated then
-								obj.Text = translated
-							end
-						end)
-					end
-				end
-			end
-		end
+		--local languages = {
+		--	{ name="German", code="de" },
+		--	{ name="English", code="en" },
+		--	{ name="Russian", code="ru" },
+		--	{ name="Swedish", code="sv" },
+		--	{ name="Finnish", code="fi" },
+		--	{ name="Greek", code="el" },
+		--	{ name="Arabic", code="ar" },
+		--	{ name="Simplified Chinese", code="zh-CN" },
+		--	{ name="Traditional Chinese", code="zh-TW" },
+		--	{ name="Thai", code="th" },
+		--	{ name="Hebrew", code="he" },
+		--	{ name="Portuguese (Brazil)", code="pt-BR" },
+		--	{ name="Portuguese (Portugal)", code="pt-PT" },
+		--	{ name="Spanish", code="es" },
+		--	{ name="French", code="fr" },
+		--	{ name="Czech", code="cs" },
+		--	{ name="Bulgarian", code="bg" },
+		--	{ name="Ukrainian", code="uk" },
+		--	{ name="Danish", code="da" },
+		--	{ name="Indonesian", code="id" },
+		--	{ name="Malay", code="ms" },
+		--	{ name="Azerbaijani", code="az" },
+		--	{ name="Japanese", code="ja" },
+		--	{ name="Korean", code="ko" }
+		--}
+		--local function translate_everything()
+		--	local lang = languages[math.random(1,#languages)]
+		--	local code = lang.code
+		--	notify("Translator", "Translating UI to "..lang.name.." ...", 3)
+		--	for _,obj in ipairs(gui:GetDescendants()) do
+		--		if obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox") then
+		--			local original = obj.Text
+		--			if original and original ~= "" then
+		--				task.spawn(function()
+		--					local translated = translate(original, code)
+		--					if translated then
+		--						obj.Text = translated
+		--					end
+		--				end)
+		--			end
+		--		end
+		--	end
+		--end
+		-- are we fucking deadass twin? do you wanna lag your game just from ts?
 		local __translatortxt = "hello"
 		local __translatorlangtarget = "en"
 		local debugname = system_name..":debug"
@@ -1675,18 +1852,23 @@ local c = NiceUI.create_click_button(".", [[!@#$%^&*()_+{}:|<>?1234567890-=[];'\
 				end
 			end)
 		end)
-		NiceUI.create_click_button(
-			format_name_for_system("Translate EVERYTHING"),
-			debugname,
-			function()
-				translate_everything()
-			end
-		)
+		for i, v in ipairs(debugmode) do
+			NiceUI.create_click_button(tostring(v..","..i), debugname, function(a)
+				debugmode[i] = not debugmode[i]
+			end)
+		end
+		--NiceUI.create_click_button(
+		--	format_name_for_system("Translate EVERYTHING"),
+		--	debugname,
+		--	function()
+		--		translate_everything()
+		--	end
+		--)
 	end)
-end)
+end
 return NiceUI
 -- EDITOR NOTE:
 --[[
-	i fixed it now twin, dw about a macOS user fixing shi
-					-some00004
+	dude whatever you're thinking on TRANSLATE EVERYTHING, you're a fucking psychopath for it
+	--thefortress1250
 ]]
