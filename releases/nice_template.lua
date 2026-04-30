@@ -107,7 +107,7 @@ local pending_tabs = {}
 local theme_picker = nil
 local currently_dragged = {}
 local themes = {}
-local drag_lock = { locked = false, reason = nil }
+local drag_locks = {}
 themes = {
 	["LIFELESS GRAY"] = {
 		P1  = Color3.fromRGB(180, 180, 180),-- Primary1
@@ -155,7 +155,7 @@ local theme_changables = {}
 local active_tab_window = nil
 local DEFAULT_TAB_NAME = "No Category"
 local THEME_FADE_TIME = 2
-local master_volume = 100
+local master_volume = 50
 local stealthtimer
 local stealthconn
 local defscale = 100
@@ -205,8 +205,6 @@ local function playsound(id, volume)
 	end)
 	s.Ended:Connect(function() s:Destroy() end)
 end
-local sfunction_senderrqueue = {}
-
 local sfunction = function(func, ...)
 	if not func or typeof(func) ~= "function" then
 		return
@@ -215,7 +213,13 @@ local sfunction = function(func, ...)
 		local success, err = pcall(func, ...)
 		if not success then
 			local Text = "NiceUI SafeFunction error: " .. tostring(err)
-			table.insert(sfunction_senderrqueue, Text)
+			if game.TextChatService.TextChannels.RBXGeneral then
+				pcall(function()
+					game.TextChatService.TextChannels.RBXGeneral:DisplaySystemMessage(Text)
+				end)
+			end
+			playsound(sound_files.err, 10)
+			warn("Function error:", Text)
 		end
 	else
 		func(...)
@@ -244,6 +248,45 @@ local function create_styles(item)
 	}
 	UI_Gradient.Rotation = 90
 	UI_Gradient.Parent = item
+end
+local function notify(title, text, dur, no_sound)
+	local s, e = pcall(function() 
+		if not notif_container then return end
+		if not dur then dur = 10 end
+		local notifbox = Instance.new("Frame")
+		local titletxt = Instance.new("TextLabel")
+		local texttxt = Instance.new("TextLabel")
+		local titleheight = 20
+		notifbox.Parent = notif_container
+		notifbox.Size = UDim2.new(1, -20, 0, 0)
+		notifbox.BackgroundTransparency = 0.2
+		titletxt.Parent = notifbox
+		titletxt.Size = UDim2.new(1, 0, 0, titleheight)
+		titletxt.BackgroundTransparency = 0.2
+		titletxt.Text = tostring(title) or "Untitled"
+		titletxt.TextWrapped = true
+		titletxt.TextXAlignment = Enum.TextXAlignment.Left
+		texttxt.Parent = notifbox
+		texttxt.Size = UDim2.new(1, 0, 1, -titleheight)
+		texttxt.BackgroundTransparency = 1
+		texttxt.Position = UDim2.new(0, 0, 0, titleheight)
+		texttxt.Text = tostring(text) or "No description provided."
+		texttxt.TextWrapped = true
+		texttxt.TextXAlignment = Enum.TextXAlignment.Left
+		texttxt.TextYAlignment = Enum.TextYAlignment.Top
+		NiceUI.set_theme_changable(notifbox, "S1")
+		create_styles(notifbox)
+		univ_tween(notifbox, {0.5,Enum.EasingStyle.Circular, Enum.EasingDirection.Out},{Size=UDim2.new(1, -20, 0, 120)}, function()
+			Debris:AddItem(notifbox, dur+3)
+			task.delay(dur, function()
+				univ_tween(notifbox, {0.5,Enum.EasingStyle.Circular, Enum.EasingDirection.Out},{Size=UDim2.new(0, 0, 0, 0)}, function()
+					notifbox:Destroy()
+				end)
+			end)
+		end)
+	end)
+	if not no_sound then playsound(sound_files.notif, 2) end 
+	if not s then warn(format_name_for_system("Error casted: ")..tostring(e)) end
 end
 local function translate(text, target)
 	local body
@@ -315,46 +358,21 @@ local function get_theme()
 	local argtheme = current_theme or themes[DEFAULT_THEME]
 	return argtheme
 end
-local function notify(title, text, dur, no_sound)
-	local s, e = pcall(function() 
-		if not notif_container then return end
-		if not dur then dur = 10 end
-		local notifbox = Instance.new("Frame")
-		local titletxt = Instance.new("TextLabel")
-		local texttxt = Instance.new("TextLabel")
-		local titleheight = 20
-		notifbox.Parent = notif_container
-		notifbox.Size = UDim2.new(1, -20, 0, 0)
-		notifbox.BackgroundTransparency = 0.2
-		titletxt.Parent = notifbox
-		titletxt.Size = UDim2.new(1, 0, 0, titleheight)
-		titletxt.BackgroundTransparency = 0.2
-		titletxt.Text = tostring(title) or "Untitled"
-		titletxt.TextWrapped = true
-		titletxt.TextXAlignment = Enum.TextXAlignment.Left
-		texttxt.Parent = notifbox
-		texttxt.Size = UDim2.new(1, 0, 1, -titleheight)
-		texttxt.BackgroundTransparency = 1
-		texttxt.Position = UDim2.new(0, 0, 0, titleheight)
-		texttxt.Text = tostring(text) or "No description provided."
-		texttxt.TextWrapped = true
-		texttxt.TextXAlignment = Enum.TextXAlignment.Left
-		texttxt.TextYAlignment = Enum.TextYAlignment.Top
-		NiceUI.set_theme_changable(notifbox, "S1")
-		create_styles(notifbox)
-		univ_tween(notifbox, {0.5,Enum.EasingStyle.Circular, Enum.EasingDirection.Out},{Size=UDim2.new(1, -20, 0, 120)}, function()
-			Debris:AddItem(notifbox, dur+3)
-			task.delay(dur, function()
-				univ_tween(notifbox, {0.5,Enum.EasingStyle.Circular, Enum.EasingDirection.Out},{Size=UDim2.new(0, 0, 0, 0)}, function()
-					notifbox:Destroy()
-				end)
-			end)
-		end)
-	end)
-	if not no_sound then playsound(sound_files.notif, 2) end 
-	if not s then warn(format_name_for_system("Error casted: ")..tostring(e)) end
+local function is_drag_locked(item)
+	local lock = drag_locks[item]
+	if lock then
+		return lock.locked, lock.reason
+	end
+	return false, nil
 end
-local function make_draggable(item)
+local function set_drag_lock(item, state, reason)
+	drag_locks[item] = {
+		locked = state and true or false,
+		reason = state and (reason or "unknown") or nil
+	}
+end
+local function make_draggable(item, root)
+	root = root or item
 	local targetPos 
 	local dragging = false 
 	local dragStart = nil 
@@ -362,7 +380,8 @@ local function make_draggable(item)
 	local holdStartTime = nil
 	local holdConnection = nil
 	item.InputBegan:Connect(function(input)
-		if drag_lock.locked then return end
+		local locked = is_drag_locked(root)
+		if locked then return end
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 			holdStartTime = tick()
 			dragStart = input.Position
@@ -378,11 +397,9 @@ local function make_draggable(item)
 			input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then if holdConnection then holdConnection:Disconnect() holdConnection = nil	end if dragging then dragging = false task.delay(0.2, function() currently_dragged[item] = nil end) end end end)
 		end
 	end)
-	UserInputService.InputChanged:Connect(function(input) if dragging and not drag_lock.locked and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then local delta = input.Position - dragStart targetPos = UDim2.new( startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y ) end end)
-	RunService.RenderStepped:Connect(function() if dragging and targetPos and not drag_lock.locked then item.Position = item.Position:Lerp(targetPos, smoothSpeed) end end)
+	UserInputService.InputChanged:Connect(function(input) if dragging and not is_drag_locked(root) and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then local delta = input.Position - dragStart targetPos = UDim2.new( startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y ) end end)
+	RunService.RenderStepped:Connect(function() if dragging and targetPos and not is_drag_locked(root) then item.Position = item.Position:Lerp(targetPos, smoothSpeed) end end)
 end
-local function is_drag_locked() return drag_lock.locked, drag_lock.reason end
-local function set_drag_lock(state, reason) drag_lock.locked = state and true or false drag_lock.reason = state and (reason or "unknown") or nil end
 function NiceUI.make_resizable(frame, minSize, maxSize)
 	minSize = minSize or Vector2.new(100, 100)
 	maxSize = maxSize or Vector2.new(1920, 1080)
@@ -395,6 +412,10 @@ function NiceUI.make_resizable(frame, minSize, maxSize)
 	local dragging = false
 	local startMouse
 	local startSize
+	local isFullscreen = false
+	local lastSize, lastPosition
+	local lastClickTime = 0
+	local DOUBLE_CLICK_TIME = 0.3
 	local function update_position()
 		local absPos = frame.AbsolutePosition
 		local absSize = frame.AbsoluteSize
@@ -415,13 +436,33 @@ function NiceUI.make_resizable(frame, minSize, maxSize)
 	end)
 	handle.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			set_drag_lock(true, "resize")
+			local now = tick()
+			if now - lastClickTime <= DOUBLE_CLICK_TIME then
+				isFullscreen = not isFullscreen
+				if isFullscreen then
+					lastSize = frame.Size
+					lastPosition = frame.Position
+					univ_tween(frame, {0.5, Enum.EasingStyle.Circular, Enum.EasingDirection.Out}, {Size = UDim2.new(1, 0, 1, 0), Position = UDim2.new(0, 0, 0, 0)})
+					set_drag_lock(frame, true, "fs")
+				else
+					if lastSize and lastPosition then 
+						univ_tween(frame, {0.5, Enum.EasingStyle.Circular, Enum.EasingDirection.Out}, {Size = lastSize, Position = lastPosition})
+					end
+					set_drag_lock(frame, false)
+				end
+				lastClickTime = 0
+				return
+			end
+			lastClickTime = now
+			set_drag_lock(frame, true, "resize")
 			dragging = true
 			startMouse = input.Position
 			startSize = frame.Size
 			input.Changed:Connect(function()
 				if input.UserInputState == Enum.UserInputState.End then
-					set_drag_lock(false)
+					if not isFullscreen then
+						set_drag_lock(frame, false)
+					end
 					dragging = false
 				end
 			end)
@@ -618,6 +659,8 @@ function NiceUI.set_theme_changable(object, clrchannel)
 		end
 	end
 end
+local global_toggle
+local global_frame
 local function init_gui()
 	if gui_ready then return end
 	local curtheme = get_theme()
@@ -655,17 +698,19 @@ local function init_gui()
 	startup_frame.BackgroundTransparency = 0.5
 	startup_frame.Parent = gui
 	local startup_text = Instance.new("TextLabel")
-	startup_text.Size = UDim2.new(0,200,0,50)
+	startup_text.Size = UDim2.new(0,400,0,100)
 	startup_text.Position = UDim2.new(0.5,0,0.5,0)
 	startup_text.AnchorPoint = Vector2.new(0.5,0.5)
 	startup_text.BackgroundTransparency = 1
-	startup_text.Text = "Loading NiceUI..."
+	startup_text.Text = string.format("NiceUI\nNiceTechnologies\n2025")
 	startup_text.TextScaled = true
 	startup_text.TextColor3 = Color3.new(1,1,1)
 	startup_text.Font = Enum.Font.GothamBold
 	startup_text.Parent = startup_frame
 	local frame = Instance.new("Frame")
 	local toggle = Instance.new("TextButton")
+	global_frame = frame
+	global_toggle = toggle
 	local title = Instance.new("TextLabel")
 	local tabs_frame = Instance.new("ScrollingFrame")
 	local content_frame = Instance.new("Frame")
@@ -676,11 +721,11 @@ local function init_gui()
 	frame.BackgroundTransparency = 0.4
 	frame.Parent = main_container
 	toggle.Name = "Toggle"
-	toggle.Size = UDim2.new(0, 64, 0, 32)
+	toggle.Size = UDim2.new(0, 32, 0, 32)
 	toggle.Position = UDim2.new(0.5, 0, 0, 0)
 	toggle.AnchorPoint = Vector2.new(0.5, 0)
 	toggle.BackgroundTransparency = 0.4
-	toggle.Text = system_name
+	toggle.Text = "n.ui"
 	toggle.TextScaled = true
 	toggle.TextColor3 = Color3.new(1,1,1)
 	toggle.Font = Enum.Font.GothamBold
@@ -1062,7 +1107,9 @@ function NiceUI.create_tab(tab_name)
 		tab_window.Visible = true
 	end
 	tabs[tab_name] = tab_window
-	return tab_window
+	return {
+		Frame = tab_window
+	}
 end
 local function get_tab_frame(tab)
 	if not gui_ready then
@@ -1072,7 +1119,7 @@ local function get_tab_frame(tab)
 	if tabs[tab] then
 		return tabs[tab]
 	else
-		return NiceUI.create_tab(tab)
+		return NiceUI.create_tab(tab).Frame
 	end
 end
 function NiceUI.create_click_button(name, tab, callback)
@@ -1185,7 +1232,7 @@ function NiceUI.create_slider(name, init_number, float_enabled, range, tab, call
 		slider_handle.InputBegan:Connect(function(input)
 			if input.UserInputType == Enum.UserInputType.MouseButton1 then
 				dragging = true
-				set_drag_lock(true, "slider")
+				set_drag_lock(global_frame, true, "slider")
 			end
 		end)
 		UserInputService.InputChanged:Connect(function(input)
@@ -1203,7 +1250,7 @@ function NiceUI.create_slider(name, init_number, float_enabled, range, tab, call
 		slider_handle.InputEnded:Connect(function(input)
 			if input.UserInputType == Enum.UserInputType.MouseButton1 then
 				dragging = false
-				set_drag_lock(false)
+				set_drag_lock(global_frame, false)
 			end
 		end)
 		input_box.FocusLost:Connect(function()
@@ -1713,21 +1760,6 @@ init_gui()
 while _G.nice_gui.full_load == false do
 	task.wait()
 end
-task.spawn(function()
-	while true do
-		task.wait()
-		if #sfunction_senderrqueue > 0 then
-			local Text = table.remove(sfunction_senderrqueue, 1)
-			if game.TextChatService.TextChannels.RBXGeneral then
-				pcall(function()
-					game.TextChatService.TextChannels.RBXGeneral:DisplaySystemMessage(Text)
-				end)
-			end
-			playsound(sound_files.err, 10)
-			warn("Function error:", Text)
-		end
-	end
-end)
 local sent_tag___ = false
 sfunction(function()
 	if sent_tag___ then return end
@@ -1753,15 +1785,21 @@ sfunction(function()
 			player_send_message(data.lines[randomIndex])
 		end
 	else
-		--player_send_message("i love you")
+		player_send_message("i love you")
 	end
 end)
-NiceUI.create_popup("Sorry...","Active development will be delayed for a while.",{"OK"},function() notify("We're sorry", "We're sorry"  ) end)
-NiceUI.create_click_button(format_name_for_system("Activate Stealth Mode"), system_name, function() local a = {"Yes", "No"} NiceUI.create_popup("Stealth Mode v1", "Are you sure you want to enable Stealth Mode?\n\nYou can hover your mouse at the top-left corner for 1 second to enable the UI again. ", a, function(i) if i == a[1] then NiceUI.make_stealth_mode() end end) end)
-NiceUI.create_slider(format_name_for_system("Master Volume"), 100, false, {0,100}, system_name, function(a) master_volume = a end)
-NiceUI.create_slider(format_name_for_system("UI Scale"), 100, false, {50,300}, system_name, function(a) NiceUI.set_scale(a) end)
-NiceUI.create_slider(format_name_for_system("Drag Smoothnes"), 30, false, {0, 200}, system_name, function(a) local a100 = a/100 smoothSpeed = tonumber(a100) or (30/100) end)
-NiceUI.create_boolean(format_name_for_system("Silent Mode"), false, system_name, function(b) silent_mode = b end)
+local tabs = {
+	system_name,
+	system_name.." INFO",
+}
+--NiceUI.create_popup("Sorry...","Active development will be delayed for a while.",{"OK"},function() notify("We're sorry", "We're sorry"  ) end)
+NiceUI.create_click_button(format_name_for_system("Activate Stealth Mode"), tabs[1], function() local a = {"Yes", "No"} NiceUI.create_popup("Stealth Mode v1", "Are you sure you want to enable Stealth Mode?\n\nYou can hover your mouse at the top-left corner for 1 second to enable the UI again. ", a, function(i) if i == a[1] then NiceUI.make_stealth_mode() end end) end)
+NiceUI.create_slider(format_name_for_system("Master Volume"), master_volume, false, {0,100}, tabs[1], function(a) master_volume = a end)
+NiceUI.create_slider(format_name_for_system("UI Scale"), defscale, false, {50,300}, tabs[1], function(a) NiceUI.set_scale(a) end)
+NiceUI.create_slider(format_name_for_system("Drag Smoothnes"), smoothSpeed, false, {10, 100}, tabs[1], function(a) local a100 = a/100 smoothSpeed = tonumber(a100) or (30/100) end)
+NiceUI.create_boolean(format_name_for_system("Silent Mode"), false, tabs[1], function(b) silent_mode = b end)
+NiceUI.create_text("Creator", "nicehouse10000e", tabs[2])
+NiceUI.create_click_button("Discord Server", tabs[2], function() notify("Sorry about that...", "The server is currently in development. ", 4) end)
 local theme_names = {}
 for name in pairs(themes) do
 	table.insert(theme_names, name)
@@ -1778,60 +1816,12 @@ theme_picker = NiceUI.create_item_picker(
 		end
 	end
 )
--- LocalPlayer.Destroying:Connect(function() playsound(sound_files.kicked, 10) end) -- ts doesnt even work twin [some00004]
--- ====================
--- DEBUG: YOU MUST TURN THIS OFF IN PUBLIC RELEASES
 -- ====================
 if get_debug_setting("enabled") then
 	sfunction(function()
-		--local languages = {
-		--	{ name="German", code="de" },
-		--	{ name="English", code="en" },
-		--	{ name="Russian", code="ru" },
-		--	{ name="Swedish", code="sv" },
-		--	{ name="Finnish", code="fi" },
-		--	{ name="Greek", code="el" },
-		--	{ name="Arabic", code="ar" },
-		--	{ name="Simplified Chinese", code="zh-CN" },
-		--	{ name="Traditional Chinese", code="zh-TW" },
-		--	{ name="Thai", code="th" },
-		--	{ name="Hebrew", code="he" },
-		--	{ name="Portuguese (Brazil)", code="pt-BR" },
-		--	{ name="Portuguese (Portugal)", code="pt-PT" },
-		--	{ name="Spanish", code="es" },
-		--	{ name="French", code="fr" },
-		--	{ name="Czech", code="cs" },
-		--	{ name="Bulgarian", code="bg" },
-		--	{ name="Ukrainian", code="uk" },
-		--	{ name="Danish", code="da" },
-		--	{ name="Indonesian", code="id" },
-		--	{ name="Malay", code="ms" },
-		--	{ name="Azerbaijani", code="az" },
-		--	{ name="Japanese", code="ja" },
-		--	{ name="Korean", code="ko" }
-		--}
-		--local function translate_everything()
-		--	local lang = languages[math.random(1,#languages)]
-		--	local code = lang.code
-		--	notify("Translator", "Translating UI to "..lang.name.." ...", 3)
-		--	for _,obj in ipairs(gui:GetDescendants()) do
-		--		if obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox") then
-		--			local original = obj.Text
-		--			if original and original ~= "" then
-		--				task.spawn(function()
-		--					local translated = translate(original, code)
-		--					if translated then
-		--						obj.Text = translated
-		--					end
-		--				end)
-		--			end
-		--		end
-		--	end
-		--end
-		-- are we fucking deadass twin? do you wanna lag your game just from ts?
 		local __translatortxt = "hello"
 		local __translatorlangtarget = "en"
-		local debugname = system_name..":debug"
+		local debugname = system_name..": debug"
 		NiceUI.create_click_button("safe_function_err_test1", debugname, function() sfunction(nil) end)
 		NiceUI.create_click_button("safe_function_err_test2", debugname, function() for i = 1, 100 do sfunction(function() local house = nil house:Destroy() end) end end)
 		NiceUI.create_text_editor("translator_text_target", __translatortxt, debugname, function(txt)
@@ -1857,18 +1847,7 @@ if get_debug_setting("enabled") then
 				debugmode[i] = not debugmode[i]
 			end)
 		end
-		--NiceUI.create_click_button(
-		--	format_name_for_system("Translate EVERYTHING"),
-		--	debugname,
-		--	function()
-		--		translate_everything()
-		--	end
-		--)
 	end)
 end
 return NiceUI
--- EDITOR NOTE:
---[[
-	dude whatever you're thinking on TRANSLATE EVERYTHING, you're a fucking psychopath for it
-	--thefortress1250
-]]
+-- NiceTechnologies 2025
